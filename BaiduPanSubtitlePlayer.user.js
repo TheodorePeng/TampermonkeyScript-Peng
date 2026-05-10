@@ -7,6 +7,8 @@
 // @match        https://pan.baidu.com/pfile/video*
 // @run-at       document-idle
 // @grant        none
+// @updateURL    https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/BaiduPanSubtitlePlayer.user.js
+// @downloadURL  https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/BaiduPanSubtitlePlayer.user.js
 // ==/UserScript==
 
 (() => {

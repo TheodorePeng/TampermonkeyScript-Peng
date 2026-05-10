@@ -8,6 +8,8 @@
 // @run-at       document-idle
 // @grant        GM_registerMenuCommand
 // @grant        GM_setClipboard
+// @updateURL    https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/GetShareNoteNotionExporter.user.js
+// @downloadURL  https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/GetShareNoteNotionExporter.user.js
 // ==/UserScript==
 
 (function () {

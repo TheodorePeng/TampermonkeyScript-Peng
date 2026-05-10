@@ -10,6 +10,8 @@
 // @grant        window.focus
 // @grant        GM_xmlhttpRequest
 // @connect      *
+// @updateURL    https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/BaiduPan%20Subtitle%20Checker%26Download-1.0.user.js
+// @downloadURL  https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/BaiduPan%20Subtitle%20Checker%26Download-1.0.user.js
 // ==/UserScript==
 
 (function() {

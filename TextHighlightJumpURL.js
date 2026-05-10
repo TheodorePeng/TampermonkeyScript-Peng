@@ -11,8 +11,8 @@
 // @grant        GM_addStyle
 // @grant        GM_setValue
 // @grant        GM_getValue
-// @updateURL    https://raw.githubusercontent.com/TheodorePeng/PengCode/main/TampermonkeyScript-Peng/TextHighlightJumpURL.js
-// @downloadURL  https://raw.githubusercontent.com/TheodorePeng/PengCode/main/TampermonkeyScript-Peng/TextHighlightJumpURL.js
+// @updateURL    https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/TextHighlightJumpURL.js
+// @downloadURL  https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/TextHighlightJumpURL.js
 // ==/UserScript==
 
 (function() {

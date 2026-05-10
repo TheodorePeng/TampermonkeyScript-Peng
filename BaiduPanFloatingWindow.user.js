@@ -6,6 +6,8 @@
 // @author       TheodorePeng & Gemini
 // @match        *://pan.baidu.com/pfile/video*
 // @grant        GM_addStyle
+// @updateURL    https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/BaiduPanFloatingWindow.user.js
+// @downloadURL  https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/BaiduPanFloatingWindow.user.js
 // ==/UserScript==
 
 (function () {

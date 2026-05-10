@@ -24,6 +24,8 @@
 // @grant       GM_xmlhttpRequest
 // @run-at      document-end
 
+// @updateURL    https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/SearchEngineJump.js
+// @downloadURL  https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/SearchEngineJump.js
 // ==/UserScript==
 
 (function () {

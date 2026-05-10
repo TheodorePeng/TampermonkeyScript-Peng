@@ -7,6 +7,8 @@
 // @match        https://www.youtube.com/watch?v=*
 // @match        https://www.bilibili.com/video/*
 // @grant        GM_addStyle
+// @updateURL    https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/Move%20subtitle%20to%20floating%20window.js
+// @downloadURL  https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/Move%20subtitle%20to%20floating%20window.js
 // ==/UserScript==
 
 (function() {

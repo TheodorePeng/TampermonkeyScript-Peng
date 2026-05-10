@@ -11,6 +11,8 @@
 // @run-at       document-start
 // @grant        window.close
 // @noframes
+// @updateURL    https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/ShortLinkDirectOpener.user.js
+// @downloadURL  https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/ShortLinkDirectOpener.user.js
 // ==/UserScript==
 
 (function () {

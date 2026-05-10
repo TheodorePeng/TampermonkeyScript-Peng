@@ -8,6 +8,8 @@
 // @run-at       document-idle
 // @grant        GM_registerMenuCommand
 // @grant        GM_download
+// @updateURL    https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/YouTubeChapterFirstFrameDownloader.user.js
+// @downloadURL  https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/YouTubeChapterFirstFrameDownloader.user.js
 // ==/UserScript==
 
 (function() {

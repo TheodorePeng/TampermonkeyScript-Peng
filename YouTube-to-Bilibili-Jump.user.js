@@ -10,6 +10,8 @@
 // @grant        GM_setClipboard
 // @grant        GM_openInTab
 // @grant        GM_xmlhttpRequest
+// @updateURL    https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/YouTube-to-Bilibili-Jump.user.js
+// @downloadURL  https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/YouTube-to-Bilibili-Jump.user.js
 // ==/UserScript==
 
 (function () {
