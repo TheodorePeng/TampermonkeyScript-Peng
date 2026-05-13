@@ -13,8 +13,8 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        unsafeWindow
-// @updateURL    https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/EudicTingMarkdownExporter.user.js
-// @downloadURL  https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/EudicTingMarkdownExporter.user.js
+// @updateURL    https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/EudicTing%20MD%20Exporter.user.js
+// @downloadURL  https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/EudicTing%20MD%20Exporter.user.js
 // ==/UserScript==
 
 (function () {
