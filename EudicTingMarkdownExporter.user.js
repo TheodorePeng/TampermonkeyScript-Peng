@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Eudic Ting Example Markdown Exporter
+// @name         EudicTingMarkdownExporter
 // @namespace    http://tampermonkey.net/
-// @version      0.1.9
+// @version      0.2.0
 // @description  Export Daily English Listening article sentences as Obsidian/Eudic note example Markdown with per-sentence source links.
 // @author       TheodorePeng
 // @match        https://ting.eudic.net/webting/*
@@ -13,8 +13,8 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        unsafeWindow
-// @updateURL    https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/EudicTingExampleMarkdownExporter.user.js
-// @downloadURL  https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/EudicTingExampleMarkdownExporter.user.js
+// @updateURL    https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/EudicTingMarkdownExporter.user.js
+// @downloadURL  https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/EudicTingMarkdownExporter.user.js
 // ==/UserScript==
 
 (function () {
@@ -434,12 +434,7 @@
             document.title || '',
         ].filter(Boolean);
 
-        for (const candidate of candidates) {
-            const title = normalizeArticleTitle(candidate);
-            if (title) return title;
-        }
-
-        return getAutoSourceLabel() || '每日英语听力文章';
+        return chooseArticleTitleCandidate(candidates) || getAutoSourceLabel() || '每日英语听力文章';
     }
 
     function getDownloadFileNameBase() {
@@ -493,9 +488,17 @@
         }
 
         const englishTitleLabel = chooseBestSourceLabel(
-            titleCandidates.map((title) => extractLeadingEnglishLabel(title)).filter(Boolean),
+            titleCandidates.map((title) => extractSpecialEnglishLabel(title)).filter(Boolean),
         );
         if (englishTitleLabel) return englishTitleLabel;
+
+        const articleTitle = chooseArticleTitleCandidate([
+            getArticleTitle(),
+            getCurrentPlayTitle(),
+            parseTitleFromMetaDescription(),
+            document.title || '',
+        ]);
+        if (articleTitle) return articleTitle;
 
         const compactTitle = sanitizeLabel(titleCandidates[0] || 'DailyTing');
         return compactTitle || 'DailyTing';
@@ -522,12 +525,33 @@
         const container = heading?.closest('div')?.parentElement;
         if (!container) return [];
 
-        return Array.from(container.querySelectorAll('p, a, span, [title], [aria-label]'))
+        return Array.from(container.querySelectorAll('.contentInfo > p.title, .playContent > p.title, p.title'))
             .map((node) => normalizeText(node.textContent || node.getAttribute('title') || node.getAttribute('aria-label') || ''))
-            .filter((text) => text && normalizeText(text) !== '当前播放');
+            .filter(isUsableArticleTitleCandidate);
     }
 
     function getArticleTitle() {
+        return chooseArticleTitleCandidate([
+            ...getStructuredArticleTitleCandidates(),
+            getArticleHeadingTitle(),
+        ]);
+    }
+
+    function getStructuredArticleTitleCandidates() {
+        const selector = [
+            '.contentInfo > p.title',
+            '.playInfo .playContent > p.title',
+            '#play .contentInfo p.title',
+            '.contentInfo p.title',
+            '.playContent p.title',
+        ].join(', ');
+
+        return Array.from(document.querySelectorAll(selector))
+            .map((node) => normalizeText(node.textContent || ''))
+            .filter(isUsableArticleTitleCandidate);
+    }
+
+    function getArticleHeadingTitle() {
         const articleRoot = document.getElementById('article');
         const h1 = articleRoot
             ? articleRoot.querySelector('h1')
@@ -543,6 +567,21 @@
         return normalizeText(match ? match[1] : '');
     }
 
+    function chooseArticleTitleCandidate(candidates) {
+        for (const candidate of candidates) {
+            const title = normalizeArticleTitle(candidate);
+            if (isUsableArticleTitleCandidate(title)) return title;
+        }
+
+        return '';
+    }
+
+    function isUsableArticleTitleCandidate(text) {
+        const normalized = normalizeArticleTitle(text);
+        if (!normalized) return false;
+        return !/^(每日英语听力|当前播放|下载.*客户端.*|上一句.*|下一句.*|播放\/暂停.*|重复播放.*)$/i.test(normalized);
+    }
+
     function extractKaoYanLabel(text) {
         const normalized = normalizeText(text);
         const match = normalized.match(/(\d{4})\s*Text\s*([1-4])/i);
@@ -555,6 +594,12 @@
         const match = normalized.match(/^[A-Za-z0-9]+(?:[ ._'’/-]+[A-Za-z0-9]+)*/);
         if (!match) return '';
         return sanitizeLabel(match[0]);
+    }
+
+    function extractSpecialEnglishLabel(text) {
+        const normalized = normalizeLeadingEnglishTitle(text);
+        if (!/\bS\d+E\d+\b/i.test(normalized)) return '';
+        return extractLeadingEnglishLabel(normalized);
     }
 
     function normalizeLeadingEnglishTitle(text) {
@@ -631,7 +676,7 @@
         return normalizeText(text)
             .replace(/[()[\]{}'"“”‘’]/g, '')
             .replace(/\s+/g, '-')
-            .replace(/[^\w.\-\u4e00-\u9fff]/g, '')
+            .replace(/[^\w.\-一-鿿]/g, '')
             .replace(/-+/g, '-')
             .replace(/^-|-$/g, '')
             .slice(0, 60);
@@ -640,7 +685,7 @@
     function sanitizeFileName(text) {
         return normalizeText(text)
             .replace(/[\\/:*?<>|]+/g, '-')
-            .replace(/[\u0000-\u001f\u007f]+/g, '')
+            .replace(/[ -]+/g, '')
             .replace(/\s+/g, ' ')
             .replace(/-+/g, '-')
             .replace(/^\.+|\.+$/g, '')
@@ -825,7 +870,7 @@
 
     function normalizeText(value) {
         return String(value || '')
-            .replace(/\u00a0/g, ' ')
+            .replace(/ /g, ' ')
             .replace(/\s+/g, ' ')
             .replace(/\s+([,.;:!?，。；：！？])/g, '$1')
             .replace(/([“‘(（])\s+/g, '$1')
