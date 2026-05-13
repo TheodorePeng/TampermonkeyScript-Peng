@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         EudicTingMarkdownExporter
+// @name         EudicTing MD Exporter
 // @namespace    http://tampermonkey.net/
 // @version      0.2.0
 // @description  Export Daily English Listening article sentences as Obsidian/Eudic note example Markdown with per-sentence source links.
