@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EudicDict Exam Sentence Scraper — 使用说明</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" aria-label="打开目录">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+      </button>
+      <div class="site-title"><a href="../index.html">TampermonkeyScript-Peng</a></div>
+    </div>
+    <nav class="site-nav">
+      <a href="../index.html">← 返回首页</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+<aside class="doc-sidebar-left"></aside>
+
+<main class="doc-content">
+
+<div class="breadcrumb">
+  <a href="../index.html">首页</a>
+  <span class="breadcrumb-sep">/</span>
+  <a href="../index.html#english">英语学习与笔记导出</a>
+  <span class="breadcrumb-sep">/</span>
+  EudicDict Exam Sentence Scraper
+</div>
+
+<h1>EudicDict Exam Sentence Scraper</h1>
+
+<p>自动爬取欧路词典词条页「大学英语四级六级考研真题库」中的考研真题句子，输出标准 Markdown 格式。</p>
+
+<h2 id="info">基本信息</h2>
+
+<table class="info-table">
+  <tr><th>脚本名称</th><td>Eudic Dict Exam Sentence Scraper</td></tr>
+  <tr><th>版本</th><td><code>1.0.2</code></td></tr>
+  <tr><th>作者</th><td>TheodorePeng</td></tr>
+  <tr><th>适用站点</th><td><code>dict.eudic.net/dicts/en/*</code></td></tr>
+  <tr><th>文件大小</th><td>约 492 行</td></tr>
+  <tr><th>更新地址</th><td><a href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/EudicDictExamSentenceScraper.user.js" target="_blank">Raw 链接</a></td></tr>
+</table>
+
+<h2 id="install">安装</h2>
+
+<p>
+  <a class="install-btn" href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/EudicDictExamSentenceScraper.user.js" target="_blank">安装脚本</a>
+  <a class="source-btn" href="https://github.com/TheodorePeng/TampermonkeyScript-Peng/blob/main/EudicDictExamSentenceScraper.user.js" target="_blank">查看源码</a>
+</p>
+
+<h2 id="features">功能介绍</h2>
+
+<ul>
+  <li><strong>自动爬取真题</strong>：自动点击「考研」标签 →「查看更多」，加载全部考研真题句子</li>
+  <li><strong>标准 Markdown 输出</strong>：生成的 Markdown 包含 <code>e.g.</code> 前缀、中文翻译、出处</li>
+  <li><strong>每日英语听力链接</strong>：每句附带每日英语听力 App 的跳转链接</li>
+  <li><strong>一键复制</strong>：爬取完成后可一键复制全部内容到剪贴板</li>
+  <li><strong>进度显示</strong>：爬取过程中实时显示加载进度</li>
+</ul>
+
+<h2 id="usage">使用方法</h2>
+
+<ol>
+  <li>安装脚本后，打开欧路词典任意英文词条页面</li>
+  <li>点击 Tampermonkey 菜单中的「爬取考研真题句子」</li>
+  <li>脚本会自动展开真题库，逐页加载全部考研例句</li>
+  <li>加载完成后弹出结果面板，显示所有爬取的句子</li>
+  <li>点击「复制」即可将标准 Markdown 格式的内容复制到剪贴板</li>
+</ol>
+
+<h2 id="format">输出格式示例</h2>
+
+<pre><code>e.g. This is a sample sentence from the exam.
+    这是考研真题中的例句中文翻译。
+    —— 来源：2020年考研英语一阅读理解
+    🔗 每日英语听力</code></pre>
+
+<div class="tip">
+  本脚本与 <a href="eudicting-md-exporter.html">EudicTing MD Exporter</a> 配合使用，可以构建完整的欧路词典 → Markdown → Obsidian 英语学习工作流。
+</div>
+
+</main>
+
+<aside class="doc-sidebar-right"></aside>
+
+</div>
+
+<button class="back-to-top" aria-label="返回顶部">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l-4.5 4.5 1.06 1.06L8 6.12l3.44 3.44 1.06-1.06z"/></svg>
+</button>
+
+<script src="../scripts-data.js"></script>
+<script src="../layout.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- TODO: Replace with your script display name -->
+  <title>YourScriptName — 使用说明</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<!-- ===== Shared Header ===== -->
+<header class="site-header">
+  <div class="site-header-inner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" aria-label="打开目录">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+      </button>
+      <div class="site-title"><a href="../index.html">TampermonkeyScript-Peng</a></div>
+    </div>
+    <nav class="site-nav">
+      <a href="../index.html">← 返回首页</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ===== Three-Column Layout ===== -->
+<div class="doc-layout">
+
+  <aside class="doc-sidebar-left"></aside>
+
+  <main class="doc-content">
+
+    <!-- ===== Breadcrumb ===== -->
+    <div class="breadcrumb">
+      <a href="../index.html">首页</a>
+      <span class="breadcrumb-sep">/</span>
+      <!-- TODO: Update category link -->
+      <a href="../index.html#category-id">分类名称</a>
+      <span class="breadcrumb-sep">/</span>
+      <!-- TODO: Script name -->
+      YourScriptName
+    </div>
+
+    <!-- ===== Page Title ===== -->
+    <h1>YourScriptName</h1>
+
+    <!-- TODO: One-line description -->
+    <p>这里写脚本的一句话功能描述。</p>
+
+    <!-- ===== Info Table ===== -->
+    <h2 id="info">基本信息</h2>
+    <table class="info-table">
+      <tr><th>脚本名称</th><td>YourScriptName</td></tr>
+      <tr><th>版本</th><td><code>1.0.0</code></td></tr>
+      <tr><th>作者</th><td>TheodorePeng</td></tr>
+      <tr><th>适用站点</th><td><code>example.com/*</code></td></tr>
+      <tr><th>文件大小</th><td>约 000 行</td></tr>
+      <tr><th>更新地址</th><td><a href="RAW_URL" target="_blank">Raw 链接</a></td></tr>
+    </table>
+
+    <!-- ===== Install Buttons ===== -->
+    <h2 id="install">安装</h2>
+    <p>
+      <a class="install-btn" href="RAW_URL" target="_blank">安装脚本</a>
+      <a class="source-btn" href="SOURCE_URL" target="_blank">查看源码</a>
+    </p>
+
+    <!-- ===== Features ===== -->
+    <h2 id="features">功能介绍</h2>
+    <ul>
+      <li><strong>功能一</strong>：功能描述</li>
+      <li><strong>功能二</strong>：功能描述</li>
+    </ul>
+
+    <!-- ===== Usage ===== -->
+    <h2 id="usage">使用方法</h2>
+    <ol>
+      <li>步骤一</li>
+      <li>步骤二</li>
+    </ol>
+
+    <!-- ===== Optional Tips / Warnings ===== -->
+    <div class="tip">
+      提示内容
+    </div>
+
+  </main>
+
+  <aside class="doc-sidebar-right"></aside>
+
+</div>
+
+<!-- ===== Back to Top ===== -->
+<button class="back-to-top" aria-label="返回顶部">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l-4.5 4.5 1.06 1.06L8 6.12l3.44 3.44 1.06-1.06z"/></svg>
+</button>
+
+<!-- ===== Shared Scripts ===== -->
+<!-- scripts-data.js must come BEFORE layout.js -->
+<script src="../scripts-data.js"></script>
+<script src="../layout.js"></script>
+
+</body>
+</html>

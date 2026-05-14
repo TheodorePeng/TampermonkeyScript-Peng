@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GetShareNote Notion Exporter — 使用说明</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" aria-label="打开目录">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+      </button>
+      <div class="site-title"><a href="../index.html">TampermonkeyScript-Peng</a></div>
+    </div>
+    <nav class="site-nav">
+      <a href="../index.html">← 返回首页</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+<aside class="doc-sidebar-left"></aside>
+
+<main class="doc-content">
+
+<div class="breadcrumb">
+  <a href="../index.html">首页</a>
+  <span class="breadcrumb-sep">/</span>
+  <a href="../index.html#english">英语学习与笔记导出</a>
+  <span class="breadcrumb-sep">/</span>
+  GetShareNote Notion Exporter
+</div>
+
+<h1>GetShareNote Notion Exporter</h1>
+
+<p>导出 GET 分享笔记为 Notion 友好的 Markdown，支持文字记录、智能总结、sprouts、子笔记的复制与下载。</p>
+
+<h2 id="info">基本信息</h2>
+
+<table class="info-table">
+  <tr><th>脚本名称</th><td>GET Share Note Notion Exporter</td></tr>
+  <tr><th>版本</th><td><code>0.2.0</code></td></tr>
+  <tr><th>作者</th><td>TheodorePeng</td></tr>
+  <tr><th>适用站点</th><td><code>biji.com/note/share_note/*</code></td></tr>
+  <tr><th>文件大小</th><td>约 3,003 行</td></tr>
+  <tr><th>更新地址</th><td><a href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/GetShareNoteNotionExporter.user.js" target="_blank">Raw 链接</a></td></tr>
+</table>
+
+<h2 id="install">安装</h2>
+
+<p>
+  <a class="install-btn" href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/GetShareNoteNotionExporter.user.js" target="_blank">安装脚本</a>
+  <a class="source-btn" href="https://github.com/TheodorePeng/TampermonkeyScript-Peng/blob/main/GetShareNoteNotionExporter.user.js" target="_blank">查看源码</a>
+</p>
+
+<h2 id="features">功能介绍</h2>
+
+<ul>
+  <li><strong>文字记录导出</strong>：导出语音笔记的文字转录内容</li>
+  <li><strong>智能总结导出</strong>：导出 AI 生成的内容总结</li>
+  <li><strong>Sprouts 导出</strong>：导出灵感速记（sprouts）内容</li>
+  <li><strong>子笔记导出</strong>：支持导出附带的子笔记内容</li>
+  <li><strong>Notion 友好格式</strong>：Markdown 格式专门针对 Notion 的导入优化</li>
+  <li><strong>复制与下载</strong>：支持一键复制到剪贴板或下载为 .md 文件</li>
+  <li><strong>完整 UI 面板</strong>：提供美观的导出控制面板，可选择导出内容类型</li>
+</ul>
+
+<h2 id="usage">使用方法</h2>
+
+<ol>
+  <li>安装脚本后，打开 GET 分享笔记页面（<code>biji.com/note/share_note/*</code>）</li>
+  <li>页面会出现浮动导出按钮</li>
+  <li>点击按钮打开导出面板</li>
+  <li>在面板中选择需要导出的内容类型（文字记录/智能总结/sprouts/子笔记）</li>
+  <li>点击「复制」复制到剪贴板，或「下载」保存为 Markdown 文件</li>
+  <li>粘贴到 Notion 中即可</li>
+</ol>
+
+<h2 id="options">导出内容选项</h2>
+
+<table class="info-table">
+  <tr><th>内容类型</th><th>说明</th></tr>
+  <tr><td>文字记录</td><td>语音转录的完整文字内容</td></tr>
+  <tr><td>智能总结</td><td>AI 自动生成的会议/内容总结</td></tr>
+  <tr><td>Sprouts</td><td>记录过程中快速添加的灵感要点</td></tr>
+  <tr><td>子笔记</td><td>该笔记下关联的子笔记内容</td></tr>
+</table>
+
+<div class="tip">
+  这是 GET 笔记导出器的完整版（v0.2.0）。如果你只需要基础功能，也可以使用早期版本 <a href="get-share-note-exporter-legacy.html">GetShareNote Exporter (Legacy)</a>。
+</div>
+
+</main>
+
+<aside class="doc-sidebar-right"></aside>
+
+</div>
+
+<button class="back-to-top" aria-label="返回顶部">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l-4.5 4.5 1.06 1.06L8 6.12l3.44 3.44 1.06-1.06z"/></svg>
+</button>
+
+<script src="../scripts-data.js"></script>
+<script src="../layout.js"></script>
+
+</body>
+</html>

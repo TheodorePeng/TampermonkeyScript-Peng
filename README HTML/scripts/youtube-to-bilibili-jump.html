@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YouTube to Bilibili Jump — 使用说明</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" aria-label="打开目录">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+      </button>
+      <div class="site-title"><a href="../index.html">TampermonkeyScript-Peng</a></div>
+    </div>
+    <nav class="site-nav">
+      <a href="../index.html">← 返回首页</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+<aside class="doc-sidebar-left"></aside>
+
+<main class="doc-content">
+
+<div class="breadcrumb">
+  <a href="../index.html">首页</a>
+  <span class="breadcrumb-sep">/</span>
+  <a href="../index.html#youtube">YouTube 增强</a>
+  <span class="breadcrumb-sep">/</span>
+  YouTube to Bilibili Jump
+</div>
+
+<h1>YouTube to Bilibili Jump</h1>
+
+<p>在 YouTube 左上角添加极小半透明按钮，左键直接跳转 B 站第一个搜索结果，右键打开面板（搜索词可编辑）。</p>
+
+<h2 id="info">基本信息</h2>
+
+<table class="info-table">
+  <tr><th>脚本名称</th><td>YouTube to Bilibili Jump</td></tr>
+  <tr><th>版本</th><td><code>0.5.1</code></td></tr>
+  <tr><th>作者</th><td>TheodorePeng</td></tr>
+  <tr><th>适用站点</th><td><code>youtube.com/watch*</code></td></tr>
+  <tr><th>文件大小</th><td>约 517 行</td></tr>
+  <tr><th>更新地址</th><td><a href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/YouTube-to-Bilibili-Jump.user.js" target="_blank">Raw 链接</a></td></tr>
+</table>
+
+<h2 id="install">安装</h2>
+
+<p>
+  <a class="install-btn" href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/YouTube-to-Bilibili-Jump.user.js" target="_blank">安装脚本</a>
+  <a class="source-btn" href="https://github.com/TheodorePeng/TampermonkeyScript-Peng/blob/main/YouTube-to-Bilibili-Jump.user.js" target="_blank">查看源码</a>
+</p>
+
+<h2 id="features">功能介绍</h2>
+
+<ul>
+  <li><strong>一键跳转 B 站</strong>：在 YouTube 视频页添加极小按钮，一键跳转到哔哩哔哩搜索相同内容</li>
+  <li><strong>自动搜索匹配</strong>：自动提取 YouTube 视频标题作为搜索词</li>
+  <li><strong>可编辑搜索词</strong>：右键点击按钮可打开面板，自由编辑搜索关键词</li>
+  <li><strong>极简设计</strong>：按钮极小且半透明，不影响正常观看体验</li>
+</ul>
+
+<h2 id="usage">使用方法</h2>
+
+<ol>
+  <li>安装脚本后，打开任意 YouTube 视频页面</li>
+  <li>页面左上角会出现一个极小的半透明按钮</li>
+  <li><strong>左键点击</strong>：直接在新标签页打开哔哩哔哩，搜索该视频标题</li>
+  <li><strong>右键点击</strong>：弹出面板，可以编辑搜索词后再跳转</li>
+</ol>
+
+<div class="tip">
+  非常适合在 YouTube 上看到有趣内容后，快速去 B 站找弹幕版或中文翻译版观看。
+</div>
+
+</main>
+
+<aside class="doc-sidebar-right"></aside>
+
+</div>
+
+<button class="back-to-top" aria-label="返回顶部">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l-4.5 4.5 1.06 1.06L8 6.12l3.44 3.44 1.06-1.06z"/></svg>
+</button>
+
+<script src="../scripts-data.js"></script>
+<script src="../layout.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BaiduPan FloatingWindow — 使用说明</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" aria-label="打开目录">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+      </button>
+      <div class="site-title"><a href="../index.html">TampermonkeyScript-Peng</a></div>
+    </div>
+    <nav class="site-nav">
+      <a href="../index.html">← 返回首页</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+<aside class="doc-sidebar-left"></aside>
+
+<main class="doc-content">
+
+<div class="breadcrumb">
+  <a href="../index.html">首页</a>
+  <span class="breadcrumb-sep">/</span>
+  <a href="../index.html#baidupan">百度网盘增强</a>
+  <span class="breadcrumb-sep">/</span>
+  BaiduPan FloatingWindow
+</div>
+
+<h1>BaiduPan FloatingWindow</h1>
+
+<p>将百度网盘视频播放器和播放列表创建为可拖动、可调整大小的浮动窗口。优化后窗口位置和大小不再受浏览器窗口缩放影响。</p>
+
+<h2 id="info">基本信息</h2>
+
+<table class="info-table">
+  <tr><th>脚本名称</th><td>BaiduPan Floating Windows (位置记忆优化)</td></tr>
+  <tr><th>版本</th><td><code>1.1</code></td></tr>
+  <tr><th>作者</th><td>TheodorePeng &amp; Gemini</td></tr>
+  <tr><th>适用站点</th><td><code>pan.baidu.com/pfile/video*</code></td></tr>
+  <tr><th>文件大小</th><td>约 316 行</td></tr>
+  <tr><th>更新地址</th><td><a href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/BaiduPanFloatingWindow.user.js" target="_blank">Raw 链接</a></td></tr>
+</table>
+
+<h2 id="install">安装</h2>
+
+<p>
+  <a class="install-btn" href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/BaiduPanFloatingWindow.user.js" target="_blank">安装脚本</a>
+  <a class="source-btn" href="https://github.com/TheodorePeng/TampermonkeyScript-Peng/blob/main/BaiduPanFloatingWindow.user.js" target="_blank">查看源码</a>
+</p>
+
+<h2 id="features">功能介绍</h2>
+
+<ul>
+  <li><strong>播放器浮动化</strong>：将百度网盘视频播放器转为可自由拖动的浮动窗口</li>
+  <li><strong>播放列表浮动化</strong>：播放列表同样可以独立浮动，方便同时查看</li>
+  <li><strong>自由调整大小</strong>：支持拖动边框调整窗口大小</li>
+  <li><strong>位置记忆</strong>：窗口位置会被记忆，刷新页面后自动恢复</li>
+  <li><strong>不受缩放影响</strong>：优化后浏览器窗口缩放不会影响浮动窗口的位置比例</li>
+</ul>
+
+<h2 id="usage">使用方法</h2>
+
+<ol>
+  <li>安装脚本后，打开百度网盘视频播放页面</li>
+  <li>页面左上角会出现一个蓝色圆形切换按钮</li>
+  <li>点击按钮即可将视频播放器转为浮动窗口模式</li>
+  <li>拖动窗口标题栏可移动位置，拖动边框可调整大小</li>
+  <li>再次点击按钮可切换回正常模式</li>
+</ol>
+
+<div class="tip">
+  如果你需要更强大的双悬浮窗功能（同时显示视频窗和资料窗），可以查看同系列的 <a href="baidupan-floating-windows-pro.html">BaiduPan FloatingWindows Pro</a>。
+</div>
+
+</main>
+
+<aside class="doc-sidebar-right"></aside>
+
+</div>
+
+<button class="back-to-top" aria-label="返回顶部">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l-4.5 4.5 1.06 1.06L8 6.12l3.44 3.44 1.06-1.06z"/></svg>
+</button>
+
+<script src="../scripts-data.js"></script>
+<script src="../layout.js"></script>
+
+</body>
+</html>

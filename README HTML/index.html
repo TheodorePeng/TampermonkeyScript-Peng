@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TampermonkeyScript-Peng — 脚本合集说明</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" aria-label="打开目录">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+      </button>
+      <div class="site-title"><a href="index.html">TampermonkeyScript-Peng</a></div>
+    </div>
+    <nav class="site-nav">
+      <a href="https://github.com/TheodorePeng/TampermonkeyScript-Peng" target="_blank">GitHub</a>
+      <a href="https://www.tampermonkey.net/" target="_blank">Tampermonkey</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+  <aside class="doc-sidebar-left"></aside>
+
+  <main class="doc-content">
+
+    <h1 id="top">TampermonkeyScript-Peng</h1>
+
+    <p>本仓库是 <a href="https://github.com/TheodorePeng" target="_blank">TheodorePeng</a> 个人常用的 Tampermonkey / Greasemonkey 用户脚本合集，用于提升日常网页浏览、学习笔记和内容获取的效率。</p>
+
+    <p>所有脚本均为开源项目，遵循 MIT License。你可以按需安装使用。</p>
+
+    <h2 id="quickstart">快速开始</h2>
+
+    <ol class="steps">
+      <li><strong>安装扩展</strong>：先安装 <a href="https://www.tampermonkey.net/" target="_blank">Tampermonkey</a>（Chrome / Edge / Safari / Firefox 均可）</li>
+      <li><strong>选择脚本</strong>：在下方找到你需要的脚本，点击进入详情页</li>
+      <li><strong>一键安装</strong>：在详情页点击「安装脚本」按钮，Tampermonkey 会自动弹出安装窗口</li>
+      <li><strong>开始使用</strong>：访问对应网站，脚本即会自动生效</li>
+    </ol>
+
+    <div class="tip">
+      <strong>提示</strong>：安装后 Tampermonkey 默认会自动检查更新。你也可以在 Tampermonkey 面板中手动点击「检查更新」。
+    </div>
+
+    <h2 id="scripts">脚本列表</h2>
+
+    <div id="scripts-index"></div>
+
+    <h2 id="disclaimer">免责声明</h2>
+
+    <ul>
+      <li>所有脚本仅供个人学习与研究使用</li>
+      <li>使用脚本时请遵守相关网站的服务条款</li>
+      <li>因使用脚本导致的任何账号异常或数据损失，作者不承担责任</li>
+      <li>部分脚本涉及页面 DOM 操作，可能因目标网站改版而失效，欢迎反馈 Issue</li>
+    </ul>
+
+    <h2 id="license">License</h2>
+
+    <p>如无特殊说明，本仓库脚本遵循 <a href="https://github.com/TheodorePeng/TampermonkeyScript-Peng/blob/main/LICENSE" target="_blank">MIT License</a>。部分脚本包含第三方引用（如 SearchEngineJump.js 引用了 greasyfork 上的 toGBK.js），其许可证遵循原作者声明。</p>
+
+  </main>
+
+  <aside class="doc-sidebar-right"></aside>
+
+</div>
+
+<button class="back-to-top" aria-label="返回顶部">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l-4.5 4.5 1.06 1.06L8 6.12l3.44 3.44 1.06-1.06z"/></svg>
+</button>
+
+<script src="scripts-data.js"></script>
+<script src="layout.js"></script>
+
+</body>
+</html>

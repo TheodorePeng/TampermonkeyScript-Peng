@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BaiduPan FloatingWindows Pro — 使用说明</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" aria-label="打开目录">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+      </button>
+      <div class="site-title"><a href="../index.html">TampermonkeyScript-Peng</a></div>
+    </div>
+    <nav class="site-nav">
+      <a href="../index.html">← 返回首页</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+<aside class="doc-sidebar-left"></aside>
+
+<main class="doc-content">
+
+<div class="breadcrumb">
+  <a href="../index.html">首页</a>
+  <span class="breadcrumb-sep">/</span>
+  <a href="../index.html#baidupan">百度网盘增强</a>
+  <span class="breadcrumb-sep">/</span>
+  BaiduPan FloatingWindows Pro
+</div>
+
+<h1>BaiduPan FloatingWindows Pro</h1>
+
+<p>Stable dual floating windows for Baidu Pan video pages with shell-based layout control, state persistence, and resilient re-binding.</p>
+
+<h2 id="info">基本信息</h2>
+
+<table class="info-table">
+  <tr><th>脚本名称</th><td>BaiduPan Floating Windows Pro</td></tr>
+  <tr><th>版本</th><td><code>1.0.9</code></td></tr>
+  <tr><th>作者</th><td>TheodorePeng &amp; Codex</td></tr>
+  <tr><th>适用站点</th><td><code>pan.baidu.com/pfile/video*</code></td></tr>
+  <tr><th>文件大小</th><td>约 1,975 行</td></tr>
+  <tr><th>更新地址</th><td><a href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/BaiduPanFloatingWindowsPro.user.js" target="_blank">Raw 链接</a></td></tr>
+</table>
+
+<h2 id="install">安装</h2>
+
+<p>
+  <a class="install-btn" href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/BaiduPanFloatingWindowsPro.user.js" target="_blank">安装脚本</a>
+  <a class="source-btn" href="https://github.com/TheodorePeng/TampermonkeyScript-Peng/blob/main/BaiduPanFloatingWindowsPro.user.js" target="_blank">查看源码</a>
+</p>
+
+<h2 id="features">功能介绍</h2>
+
+<ul>
+  <li><strong>双悬浮窗设计</strong>：同时提供视频播放浮动窗和视频资料浮动窗</li>
+  <li><strong>Shell 布局控制</strong>：支持多种布局模式，灵活调整窗口排列方式</li>
+  <li><strong>状态持久化</strong>：窗口位置、大小、折叠状态均会自动保存</li>
+  <li><strong>Resilient Re-binding</strong>：页面动态更新后自动重新绑定，无需刷新</li>
+  <li><strong>标签切换</strong>：资料窗支持「视频」「笔记」「AI看」「课件」「文稿」标签切换</li>
+  <li><strong>拖拽 pills</strong>：支持通过 pill 控件快速拖拽调整布局</li>
+</ul>
+
+<h2 id="usage">使用方法</h2>
+
+<ol>
+  <li>安装脚本后，打开百度网盘视频播放页面</li>
+  <li>脚本会自动初始化双悬浮窗布局</li>
+  <li>视频播放窗可自由拖动和调整大小</li>
+  <li>资料窗位于另一侧，点击顶部标签可切换内容类型</li>
+  <li>拖动窗口间的 pill 控件可快速调整两窗比例</li>
+</ol>
+
+<h2 id="tech">技术特性</h2>
+
+<table class="info-table">
+  <tr><th>特性</th><th>说明</th></tr>
+  <tr><td>自动恢复</td><td>页面刷新或导航后，窗口状态和布局自动恢复</td></tr>
+  <tr><td>动态绑定</td><td>百度网盘动态加载内容后，脚本自动重新绑定事件</td></tr>
+  <tr><td>边界保护</td><td>窗口不会拖出可视区域，自动贴边吸附</td></tr>
+  <tr><td>最小化</td><td>支持折叠为小型控制条，需要时一键展开</td></tr>
+</table>
+
+</main>
+
+<aside class="doc-sidebar-right"></aside>
+
+</div>
+
+<button class="back-to-top" aria-label="返回顶部">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l-4.5 4.5 1.06 1.06L8 6.12l3.44 3.44 1.06-1.06z"/></svg>
+</button>
+
+<script src="../scripts-data.js"></script>
+<script src="../layout.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BaiduPan Subtitle Checker &amp; Download — 使用说明</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" aria-label="打开目录">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+      </button>
+      <div class="site-title"><a href="../index.html">TampermonkeyScript-Peng</a></div>
+    </div>
+    <nav class="site-nav">
+      <a href="../index.html">← 返回首页</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+<aside class="doc-sidebar-left"></aside>
+
+<main class="doc-content">
+
+<div class="breadcrumb">
+  <a href="../index.html">首页</a>
+  <span class="breadcrumb-sep">/</span>
+  <a href="../index.html#baidupan">百度网盘增强</a>
+  <span class="breadcrumb-sep">/</span>
+  BaiduPan Subtitle Checker &amp; Download
+</div>
+
+<h1>BaiduPan Subtitle Checker &amp; Download</h1>
+
+<p>检测网络请求中的 netdisk-subtitle 关键字并自动下载字幕文件。</p>
+
+<h2 id="info">基本信息</h2>
+
+<table class="info-table">
+  <tr><th>脚本名称</th><td>BaiduPan Subtitle Checker&amp;Download</td></tr>
+  <tr><th>版本</th><td><code>1.0</code></td></tr>
+  <tr><th>作者</th><td>Your Name</td></tr>
+  <tr><th>适用站点</th><td><code>pan.baidu.com/*</code></td></tr>
+  <tr><th>文件大小</th><td>约 438 行</td></tr>
+  <tr><th>更新地址</th><td><a href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/BaiduPan%20Subtitle%20Checker%26Download-1.0.user.js" target="_blank">Raw 链接</a></td></tr>
+</table>
+
+<h2 id="install">安装</h2>
+
+<p>
+  <a class="install-btn" href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/BaiduPan%20Subtitle%20Checker%26Download-1.0.user.js" target="_blank">安装脚本</a>
+  <a class="source-btn" href="https://github.com/TheodorePeng/TampermonkeyScript-Peng/blob/main/BaiduPan%20Subtitle%20Checker%26Download-1.0.user.js" target="_blank">查看源码</a>
+</p>
+
+<h2 id="features">功能介绍</h2>
+
+<ul>
+  <li><strong>网络请求监听</strong>：自动监听百度网盘页面发出的网络请求</li>
+  <li><strong>字幕检测</strong>：检测请求中是否包含 <code>netdisk-subtitle</code> 关键字</li>
+  <li><strong>自动下载</strong>：检测到字幕后自动触发下载</li>
+  <li><strong>下载状态提示</strong>：在页面左下角显示绿色下载图标，表示字幕已下载</li>
+  <li><strong>防重复下载</strong>：同一会话中已下载的字幕不会重复下载</li>
+</ul>
+
+<h2 id="usage">使用方法</h2>
+
+<ol>
+  <li>安装脚本后，打开百度网盘任意页面</li>
+  <li>当页面加载包含字幕的视频时，脚本会自动监听网络请求</li>
+  <li>检测到字幕文件后，会自动下载到浏览器默认下载目录</li>
+  <li>页面左下角会显示绿色图标，表示字幕已成功下载</li>
+</ol>
+
+<div class="tip">
+  本脚本与 <a href="baidupan-subtitle-player.html">BaiduPan SubtitlePlayer</a> 配合使用效果更佳：先用本脚本自动下载字幕，再用 SubtitlePlayer 加载并同步播放。
+</div>
+
+</main>
+
+<aside class="doc-sidebar-right"></aside>
+
+</div>
+
+<button class="back-to-top" aria-label="返回顶部">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l-4.5 4.5 1.06 1.06L8 6.12l3.44 3.44 1.06-1.06z"/></svg>
+</button>
+
+<script src="../scripts-data.js"></script>
+<script src="../layout.js"></script>
+
+</body>
+</html>

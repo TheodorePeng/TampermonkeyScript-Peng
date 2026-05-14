@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GetShareNote Exporter (Legacy) — 使用说明</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" aria-label="打开目录">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+      </button>
+      <div class="site-title"><a href="../index.html">TampermonkeyScript-Peng</a></div>
+    </div>
+    <nav class="site-nav">
+      <a href="../index.html">← 返回首页</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+<aside class="doc-sidebar-left"></aside>
+
+<main class="doc-content">
+
+<div class="breadcrumb">
+  <a href="../index.html">首页</a>
+  <span class="breadcrumb-sep">/</span>
+  <a href="../index.html#english">英语学习与笔记导出</a>
+  <span class="breadcrumb-sep">/</span>
+  GetShareNote Exporter (Legacy)
+</div>
+
+<h1>GetShareNote Exporter (Legacy)</h1>
+
+<p>GET 分享笔记导出的早期版本，功能相对简单，支持基础的文字记录和子笔记导出。</p>
+
+<h2 id="info">基本信息</h2>
+
+<table class="info-table">
+  <tr><th>脚本名称</th><td>GET Share Note Notion Exporter</td></tr>
+  <tr><th>版本</th><td><code>0.1.0</code>（早期版本）</td></tr>
+  <tr><th>作者</th><td>TheodorePeng</td></tr>
+  <tr><th>适用站点</th><td><code>biji.com/note/share_note/*</code></td></tr>
+  <tr><th>文件大小</th><td>约 1,838 行</td></tr>
+  <tr><th>更新地址</th><td><a href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/get.js" target="_blank">Raw 链接</a></td></tr>
+</table>
+
+<h2 id="install">安装</h2>
+
+<p>
+  <a class="install-btn" href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/get.js" target="_blank">安装脚本</a>
+  <a class="source-btn" href="https://github.com/TheodorePeng/TampermonkeyScript-Peng/blob/main/get.js" target="_blank">查看源码</a>
+</p>
+
+<h2 id="features">功能介绍</h2>
+
+<ul>
+  <li><strong>文字记录导出</strong>：导出语音笔记的完整文字转录</li>
+  <li><strong>子笔记导出</strong>：支持导出附带的子笔记</li>
+  <li><strong>Notion 友好格式</strong>：输出 Markdown 格式，适合导入 Notion</li>
+  <li><strong>页面内预览</strong>：导出前可在页面内预览 Markdown 内容</li>
+  <li><strong>复制与下载</strong>：支持复制到剪贴板或下载文件</li>
+</ul>
+
+<h2 id="usage">使用方法</h2>
+
+<ol>
+  <li>安装脚本后，打开 GET 分享笔记页面</li>
+  <li>点击 Tampermonkey 菜单中的导出选项</li>
+  <li>在弹出面板中查看导出内容</li>
+  <li>点击「复制」或「下载」获取 Markdown 内容</li>
+</ol>
+
+<div class="warning">
+  这是早期版本（v0.1.0），功能相对基础。如需完整功能（智能总结、sprouts、更完善的 UI 面板等），建议使用新版 <a href="get-share-note-notion-exporter.html">GetShareNote Notion Exporter v0.2.0</a>。
+</div>
+
+</main>
+
+<aside class="doc-sidebar-right"></aside>
+
+</div>
+
+<button class="back-to-top" aria-label="返回顶部">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l-4.5 4.5 1.06 1.06L8 6.12l3.44 3.44 1.06-1.06z"/></svg>
+</button>
+
+<script src="../scripts-data.js"></script>
+<script src="../layout.js"></script>
+
+</body>
+</html>

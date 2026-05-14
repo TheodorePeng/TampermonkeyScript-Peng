@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BaiduPan AutoProcess — 使用说明</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" aria-label="打开目录">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+      </button>
+      <div class="site-title"><a href="../index.html">TampermonkeyScript-Peng</a></div>
+    </div>
+    <nav class="site-nav">
+      <a href="../index.html">← 返回首页</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+<aside class="doc-sidebar-left"></aside>
+
+<main class="doc-content">
+
+<div class="breadcrumb">
+  <a href="../index.html">首页</a>
+  <span class="breadcrumb-sep">/</span>
+  <a href="../index.html#baidupan">百度网盘增强</a>
+  <span class="breadcrumb-sep">/</span>
+  BaiduPan AutoProcess
+</div>
+
+<h1>BaiduPan AutoProcess</h1>
+
+<p>批量触发百度网盘视频的文稿/课件/AI看/笔记按钮，支持按键交互控制。</p>
+
+<h2 id="info">基本信息</h2>
+
+<table class="info-table">
+  <tr><th>脚本名称</th><td>Baidupan 批量触发AI内容生成</td></tr>
+  <tr><th>版本</th><td><code>1.8</code></td></tr>
+  <tr><th>作者</th><td>TheodorePeng</td></tr>
+  <tr><th>适用站点</th><td><code>pan.baidu.com/pfile/video*</code></td></tr>
+  <tr><th>文件大小</th><td>约 683 行</td></tr>
+  <tr><th>更新地址</th><td><a href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/BaiduPan-AutoProcess.user.js" target="_blank">Raw 链接</a></td></tr>
+</table>
+
+<h2 id="install">安装</h2>
+
+<p>
+  <a class="install-btn" href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/BaiduPan-AutoProcess.user.js" target="_blank">安装脚本</a>
+  <a class="source-btn" href="https://github.com/TheodorePeng/TampermonkeyScript-Peng/blob/main/BaiduPan-AutoProcess.user.js" target="_blank">查看源码</a>
+</p>
+
+<h2 id="features">功能介绍</h2>
+
+<ul>
+  <li><strong>批量触发 AI 内容</strong>：自动依次点击视频的「文稿」「课件」「AI看」「笔记」按钮，批量生成 AI 内容</li>
+  <li><strong>按键交互控制</strong>：处理过程中按 <code>Y</code> 继续、<code>N</code> 停止，方便随时控制流程</li>
+  <li><strong>可配置参数</strong>：支持设置循环次数、页面加载延迟、各类型按钮的点击延迟</li>
+  <li><strong>本地存储记录</strong>：自动记录已处理过的视频，避免重复操作</li>
+</ul>
+
+<h2 id="usage">使用方法</h2>
+
+<ol>
+  <li>安装脚本后，打开百度网盘视频播放页面</li>
+  <li>脚本会自动检测页面并显示控制面板</li>
+  <li>设置好需要的循环次数和延迟参数</li>
+  <li>点击开始，脚本会自动批量点击 AI 功能按钮</li>
+  <li>处理过程中可按 <code>Y</code> 继续下一个，<code>N</code> 停止批量操作</li>
+</ol>
+
+<h2 id="config">可配置项</h2>
+
+<table class="info-table">
+  <tr><th>配置项</th><th>默认值</th><th>说明</th></tr>
+  <tr><td>循环次数</td><td>14</td><td>批量处理的视频数量上限</td></tr>
+  <tr><td>页面加载延迟</td><td>2 秒</td><td>切换视频后的等待时间</td></tr>
+  <tr><td>继续键</td><td><code>Y</code></td><td>确认继续处理的按键</td></tr>
+  <tr><td>停止键</td><td><code>N</code></td><td>停止批量处理的按键</td></tr>
+  <tr><td>按键超时</td><td>30 秒</td><td>等待用户按键的最大时间</td></tr>
+</table>
+
+<div class="warning">
+  使用本脚本时，请确保你的百度网盘账号已开通相关 AI 功能权限，否则按钮可能无法触发。
+</div>
+
+</main>
+
+<aside class="doc-sidebar-right"></aside>
+
+</div>
+
+<button class="back-to-top" aria-label="返回顶部">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l-4.5 4.5 1.06 1.06L8 6.12l3.44 3.44 1.06-1.06z"/></svg>
+</button>
+
+<script src="../scripts-data.js"></script>
+<script src="../layout.js"></script>
+
+</body>
+</html>

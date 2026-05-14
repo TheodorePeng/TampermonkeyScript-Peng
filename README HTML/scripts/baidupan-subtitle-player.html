@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BaiduPan SubtitlePlayer — 使用说明</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" aria-label="打开目录">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+      </button>
+      <div class="site-title"><a href="../index.html">TampermonkeyScript-Peng</a></div>
+    </div>
+    <nav class="site-nav">
+      <a href="../index.html">← 返回首页</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+<aside class="doc-sidebar-left"></aside>
+
+<main class="doc-content">
+
+<div class="breadcrumb">
+  <a href="../index.html">首页</a>
+  <span class="breadcrumb-sep">/</span>
+  <a href="../index.html#baidupan">百度网盘增强</a>
+  <span class="breadcrumb-sep">/</span>
+  BaiduPan SubtitlePlayer
+</div>
+
+<h1>BaiduPan SubtitlePlayer</h1>
+
+<p>Floating subtitle panel for pan.baidu.com video pages. Load local SRT/VTT, sync with video, click-to-seek, smart scroll, bilingual blur &amp; swap.</p>
+
+<h2 id="info">基本信息</h2>
+
+<table class="info-table">
+  <tr><th>脚本名称</th><td>Baidu Pan Video Caption Helper (Local Subtitles)</td></tr>
+  <tr><th>版本</th><td><code>0.9.2</code></td></tr>
+  <tr><th>作者</th><td>you</td></tr>
+  <tr><th>适用站点</th><td><code>pan.baidu.com/pfile/video*</code></td></tr>
+  <tr><th>文件大小</th><td>约 1,325 行</td></tr>
+  <tr><th>更新地址</th><td><a href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/BaiduPanSubtitlePlayer.user.js" target="_blank">Raw 链接</a></td></tr>
+</table>
+
+<h2 id="install">安装</h2>
+
+<p>
+  <a class="install-btn" href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/BaiduPanSubtitlePlayer.user.js" target="_blank">安装脚本</a>
+  <a class="source-btn" href="https://github.com/TheodorePeng/TampermonkeyScript-Peng/blob/main/BaiduPanSubtitlePlayer.user.js" target="_blank">查看源码</a>
+</p>
+
+<h2 id="features">功能介绍</h2>
+
+<ul>
+  <li><strong>本地字幕加载</strong>：支持加载本地的 SRT 和 VTT 格式字幕文件</li>
+  <li><strong>视频同步</strong>：字幕与视频播放进度实时同步</li>
+  <li><strong>点击跳转</strong>：点击字幕行可直接跳转到视频对应时间点</li>
+  <li><strong>智能滚动</strong>：当前播放字幕自动滚动到视野中央</li>
+  <li><strong>双语模糊</strong>：支持双语字幕，可模糊原文或译文进行背诵练习</li>
+  <li><strong>双语切换</strong>：一键切换显示原文、译文或双语</li>
+  <li><strong>双视图模式</strong>：支持「列表模式」和「文章模式」两种显示方式</li>
+</ul>
+
+<h2 id="usage">使用方法</h2>
+
+<ol>
+  <li>安装脚本后，打开百度网盘视频播放页面</li>
+  <li>脚本会自动显示字幕浮动面板</li>
+  <li>点击面板上的「加载字幕」按钮，选择本地 SRT 或 VTT 文件</li>
+  <li>字幕会自动与视频同步，播放时高亮当前句</li>
+  <li>点击任意字幕行可跳转到对应视频时间点</li>
+  <li>通过面板设置可切换视图模式、调整自动滚动行为等</li>
+</ol>
+
+<h2 id="config">可配置项</h2>
+
+<table class="info-table">
+  <tr><th>配置项</th><th>默认值</th><th>说明</th></tr>
+  <tr><td>视图模式</td><td>列表</td><td>列表模式 / 文章模式</td></tr>
+  <tr><td>滚动模式</td><td>居中</td><td>当前句居中 / 置顶</td></tr>
+  <tr><td>自动滚动</td><td>开启</td><td>播放时是否自动滚动字幕</td></tr>
+  <tr><td>双语互换</td><td>关闭</td><td>是否互换原文和译文位置</td></tr>
+</table>
+
+<div class="tip">
+  本脚本非常适合用百度网盘观看外语学习视频时加载自制字幕使用。配合「双语模糊」功能可以进行听力练习。
+</div>
+
+</main>
+
+<aside class="doc-sidebar-right"></aside>
+
+</div>
+
+<button class="back-to-top" aria-label="返回顶部">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l-4.5 4.5 1.06 1.06L8 6.12l3.44 3.44 1.06-1.06z"/></svg>
+</button>
+
+<script src="../scripts-data.js"></script>
+<script src="../layout.js"></script>
+
+</body>
+</html>

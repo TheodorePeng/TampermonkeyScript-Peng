@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Move Subtitle to Floating Window — 使用说明</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" aria-label="打开目录">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+      </button>
+      <div class="site-title"><a href="../index.html">TampermonkeyScript-Peng</a></div>
+    </div>
+    <nav class="site-nav">
+      <a href="../index.html">← 返回首页</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+<aside class="doc-sidebar-left"></aside>
+
+<main class="doc-content">
+
+<div class="breadcrumb">
+  <a href="../index.html">首页</a>
+  <span class="breadcrumb-sep">/</span>
+  <a href="../index.html#baidupan">百度网盘增强</a>
+  <span class="breadcrumb-sep">/</span>
+  Move Subtitle to Floating Window
+</div>
+
+<h1>Move Subtitle to Floating Window</h1>
+
+<p>现代化的字幕悬浮窗口工具，支持拖拽、调整大小、折叠和透明度控制，适用于 YouTube 和哔哩哔哩。</p>
+
+<h2 id="info">基本信息</h2>
+
+<table class="info-table">
+  <tr><th>脚本名称</th><td>Move subtitle to floating window</td></tr>
+  <tr><th>版本</th><td><code>1.36</code></td></tr>
+  <tr><th>作者</th><td>TheodorePeng</td></tr>
+  <tr><th>适用站点</th><td>YouTube (<code>youtube.com/watch?v=*</code>) · Bilibili (<code>bilibili.com/video/*</code>)</td></tr>
+  <tr><th>文件大小</th><td>约 928 行</td></tr>
+  <tr><th>更新地址</th><td><a href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/Move%20subtitle%20to%20floating%20window.js" target="_blank">Raw 链接</a></td></tr>
+</table>
+
+<h2 id="install">安装</h2>
+
+<p>
+  <a class="install-btn" href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/Move%20subtitle%20to%20floating%20window.js" target="_blank">安装脚本</a>
+  <a class="source-btn" href="https://github.com/TheodorePeng/TampermonkeyScript-Peng/blob/main/Move%20subtitle%20to%20floating%20window.js" target="_blank">查看源码</a>
+</p>
+
+<h2 id="features">功能介绍</h2>
+
+<ul>
+  <li><strong>字幕悬浮化</strong>：将视频内置字幕提取到独立的浮动窗口中显示</li>
+  <li><strong>自由拖拽</strong>：可以随意拖动字幕窗口到屏幕任意位置</li>
+  <li><strong>调整大小</strong>：支持拖动边框调整字幕窗口大小</li>
+  <li><strong>折叠/展开</strong>：支持将字幕窗口折叠为小型按钮，需要时一键展开</li>
+  <li><strong>透明度控制</strong>：可调节字幕窗口的背景透明度</li>
+  <li><strong>双站支持</strong>：同时支持 YouTube 和哔哩哔哩两大视频网站</li>
+</ul>
+
+<h2 id="usage">使用方法</h2>
+
+<ol>
+  <li>安装脚本后，打开 YouTube 或 Bilibili 视频页面</li>
+  <li>页面会出现一个悬浮控制按钮</li>
+  <li>点击按钮即可将视频字幕提取到浮动窗口</li>
+  <li>拖动窗口调整位置，拖动边框调整大小</li>
+  <li>点击折叠按钮可将字幕收为小型控制条</li>
+</ol>
+
+<h2 id="sites">支持的网站</h2>
+
+<table class="info-table">
+  <tr><th>网站</th><th>匹配规则</th><th>说明</th></tr>
+  <tr><td>YouTube</td><td><code>youtube.com/watch?v=*</code></td><td>支持所有视频页面的字幕悬浮</td></tr>
+  <tr><td>哔哩哔哩</td><td><code>bilibili.com/video/*</code></td><td>支持所有视频页面的字幕/CC字幕悬浮</td></tr>
+</table>
+
+</main>
+
+<aside class="doc-sidebar-right"></aside>
+
+</div>
+
+<button class="back-to-top" aria-label="返回顶部">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l-4.5 4.5 1.06 1.06L8 6.12l3.44 3.44 1.06-1.06z"/></svg>
+</button>
+
+<script src="../scripts-data.js"></script>
+<script src="../layout.js"></script>
+
+</body>
+</html>

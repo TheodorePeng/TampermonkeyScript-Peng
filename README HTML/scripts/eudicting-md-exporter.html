@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EudicTing MD Exporter — 使用说明</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" aria-label="打开目录">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+      </button>
+      <div class="site-title"><a href="../index.html">TampermonkeyScript-Peng</a></div>
+    </div>
+    <nav class="site-nav">
+      <a href="../index.html">← 返回首页</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+<aside class="doc-sidebar-left"></aside>
+
+<main class="doc-content">
+
+<div class="breadcrumb">
+  <a href="../index.html">首页</a>
+  <span class="breadcrumb-sep">/</span>
+  <a href="../index.html#english">英语学习与笔记导出</a>
+  <span class="breadcrumb-sep">/</span>
+  EudicTing MD Exporter
+</div>
+
+<h1>EudicTing MD Exporter</h1>
+
+<p>导出每日英语听力（欧路词典）文章句子为 Markdown 格式，支持逐句来源链接，适配 Obsidian / Eudic 笔记。</p>
+
+<h2 id="info">基本信息</h2>
+
+<table class="info-table">
+  <tr><th>脚本名称</th><td>EudicTing MD Exporter</td></tr>
+  <tr><th>版本</th><td><code>0.2.0</code></td></tr>
+  <tr><th>作者</th><td>TheodorePeng</td></tr>
+  <tr><th>适用站点</th><td>ting.eudic.net · dict.eudic.net · cn.eudic.net</td></tr>
+  <tr><th>文件大小</th><td>约 1,056 行</td></tr>
+  <tr><th>更新地址</th><td><a href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/EudicTing%20MD%20Exporter.user.js" target="_blank">Raw 链接</a></td></tr>
+</table>
+
+<h2 id="install">安装</h2>
+
+<p>
+  <a class="install-btn" href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/EudicTing%20MD%20Exporter.user.js" target="_blank">安装脚本</a>
+  <a class="source-btn" href="https://github.com/TheodorePeng/TampermonkeyScript-Peng/blob/main/EudicTing%20MD%20Exporter.user.js" target="_blank">查看源码</a>
+</p>
+
+<h2 id="features">功能介绍</h2>
+
+<ul>
+  <li><strong>Markdown 导出</strong>：将每日英语听力的文章内容导出为标准 Markdown 格式</li>
+  <li><strong>逐句来源链接</strong>：每句话都附带来源链接，方便回溯原文</li>
+  <li><strong>Obsidian 适配</strong>：导出格式兼容 Obsidian 笔记软件的语法规范</li>
+  <li><strong>Eudic 适配</strong>：同样兼容欧路词典笔记系统的导入格式</li>
+  <li><strong>来源标签自定义</strong>：支持自定义文章来源标签</li>
+  <li><strong>元数据控制</strong>：可选择是否包含标题、日期等元数据</li>
+  <li><strong>空白行设置</strong>：支持调整句子间的空白行数</li>
+</ul>
+
+<h2 id="usage">使用方法</h2>
+
+<ol>
+  <li>安装脚本后，打开欧路词典每日英语听力网页版</li>
+  <li>打开任意文章页面</li>
+  <li>点击 Tampermonkey 菜单中的导出选项，或页面上的导出按钮</li>
+  <li>在弹出面板中选择导出选项（元数据、来源标签、空白行等）</li>
+  <li>点击「复制」将内容复制到剪贴板，或「下载」保存为 .md 文件</li>
+  <li>粘贴到 Obsidian 或 Eudic 笔记中即可</li>
+</ol>
+
+<h2 id="options">导出选项</h2>
+
+<table class="info-table">
+  <tr><th>选项</th><th>说明</th></tr>
+  <tr><td>包含元数据</td><td>是否在开头添加标题、日期等 YAML frontmatter</td></tr>
+  <tr><td>来源标签</td><td>自定义文章来源的标签名称</td></tr>
+  <tr><td>逐句链接</td><td>是否为每句话添加跳转到原文的链接</td></tr>
+  <tr><td>空白行数</td><td>句子之间的空行数量</td></tr>
+</table>
+
+</main>
+
+<aside class="doc-sidebar-right"></aside>
+
+</div>
+
+<button class="back-to-top" aria-label="返回顶部">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l-4.5 4.5 1.06 1.06L8 6.12l3.44 3.44 1.06-1.06z"/></svg>
+</button>
+
+<script src="../scripts-data.js"></script>
+<script src="../layout.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SearchEngineJump — 使用说明</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" aria-label="打开目录">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+      </button>
+      <div class="site-title"><a href="../index.html">TampermonkeyScript-Peng</a></div>
+    </div>
+    <nav class="site-nav">
+      <a href="../index.html">← 返回首页</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+<aside class="doc-sidebar-left"></aside>
+
+<main class="doc-content">
+
+<div class="breadcrumb">
+  <a href="../index.html">首页</a>
+  <span class="breadcrumb-sep">/</span>
+  <a href="../index.html#search">搜索与导航</a>
+  <span class="breadcrumb-sep">/</span>
+  SearchEngineJump
+</div>
+
+<h1>SearchEngineJump</h1>
+
+<p>在各搜索引擎之间快捷跳转，支持可视化设置菜单，能更友好的自定义设置，修复百度搜索样式丢失的问题。</p>
+
+<h2 id="info">基本信息</h2>
+
+<table class="info-table">
+  <tr><th>脚本名称</th><td>searchEngineJump 搜索引擎快捷跳转</td></tr>
+  <tr><th>版本</th><td><code>5.27.2</code></td></tr>
+  <tr><th>作者</th><td>Peng</td></tr>
+  <tr><th>适用站点</th><td>所有搜索引擎页面（<code>*://*/*</code>）</td></tr>
+  <tr><th>文件大小</th><td>约 5,921 行</td></tr>
+  <tr><th>更新地址</th><td><a href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/SearchEngineJump.js" target="_blank">Raw 链接</a></td></tr>
+</table>
+
+<h2 id="install">安装</h2>
+
+<p>
+  <a class="install-btn" href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/SearchEngineJump.js" target="_blank">安装脚本</a>
+  <a class="source-btn" href="https://github.com/TheodorePeng/TampermonkeyScript-Peng/blob/main/SearchEngineJump.js" target="_blank">查看源码</a>
+</p>
+
+<div class="tip">
+  点击「安装脚本」后，Tampermonkey 会自动弹出安装确认窗口，点击「安装」即可。
+</div>
+
+<h2 id="features">功能介绍</h2>
+
+<ul>
+  <li><strong>搜索引擎快捷跳转</strong>：在任意搜索引擎页面，快速切换到其他搜索引擎进行相同关键词的搜索</li>
+  <li><strong>可视化设置菜单</strong>：提供图形化配置界面，方便自定义搜索引擎列表和显示方式</li>
+  <li><strong>百度搜索样式修复</strong>：修复百度搜索页面样式丢失的问题</li>
+  <li><strong>高度可定制</strong>：支持添加、删除、排序搜索引擎，满足个性化需求</li>
+</ul>
+
+<h2 id="usage">使用方法</h2>
+
+<ol>
+  <li>安装脚本后，访问任意搜索引擎页面（如 Google、百度、必应等）</li>
+  <li>页面会自动出现搜索引擎跳转工具栏</li>
+  <li>点击想要切换的搜索引擎图标，即可用当前搜索词在新引擎中搜索</li>
+  <li>右键点击工具栏或访问 Tampermonkey 菜单，可打开设置面板进行自定义</li>
+</ol>
+
+<h2 id="deps">依赖说明</h2>
+
+<p>本脚本引用了 greasyfork 上的 <code>toGBK.js</code> 用于编码转换，安装时会自动加载。</p>
+
+</main>
+
+<aside class="doc-sidebar-right"></aside>
+
+</div>
+
+<button class="back-to-top" aria-label="返回顶部">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l-4.5 4.5 1.06 1.06L8 6.12l3.44 3.44 1.06-1.06z"/></svg>
+</button>
+
+<script src="../scripts-data.js"></script>
+<script src="../layout.js"></script>
+
+</body>
+</html>
