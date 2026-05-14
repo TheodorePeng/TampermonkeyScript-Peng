@@ -58,7 +58,8 @@
 
 | 脚本 | 功能简介 | 适用站点 |
 |------|---------|---------|
-| **[EudicTingExampleMarkdownExporter.user.js](EudicTingExampleMarkdownExporter.user.js)** | 导出每日英语听力（欧路词典）文章句子为 Markdown 格式，支持逐句来源链接，适配 Obsidian / Eudic 笔记 | `ting.eudic.net` / `dict.eudic.net` |
+| **[EudicTing MD Exporter.user.js](EudicTing%20MD%20Exporter.user.js)** | 导出每日英语听力（欧路词典）文章句子为 Markdown 格式，支持逐句来源链接，适配 Obsidian / Eudic 笔记 | `ting.eudic.net` / `dict.eudic.net` |
+| **[EudicDictExamSentenceScraper.user.js](EudicDictExamSentenceScraper.user.js)** | 自动爬取欧路词典词条页「大学英语四级六级考研真题库」中的考研真题句子，自动点击「考研」→「查看更多」加载全部内容，输出标准 Markdown 格式（含 `e.g.` 前缀、中文翻译、出处及每日英语听力 App 链接） | `dict.eudic.net/dicts/en/*` |
 | **[GetShareNoteNotionExporter.user.js](GetShareNoteNotionExporter.user.js)** | 导出 GET 分享笔记为 Notion 友好的 Markdown，支持文字记录、智能总结、 sprouts、子笔记的复制与下载 | `biji.com/note/share_note/*` |
 | **[get.js](get.js)** | GET 分享笔记导出的早期版本（v0.1.0） | `biji.com/note/share_note/*` |
 
