@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BaiduPan Floating Windows Pro
 // @namespace    https://example.local/
-// @version      1.0.9
+// @version      1.0.10
 // @description  Stable dual floating windows for Baidu Pan video pages with shell-based layout control, state persistence, and resilient re-binding.
 // @author       TheodorePeng & Codex
 // @match        *://pan.baidu.com/pfile/video*
@@ -16,7 +16,7 @@
 (() => {
     "use strict";
 
-    const APP_VERSION = "1.0.9";
+    const APP_VERSION = "1.0.10";
     const APP_KEY = "__BPFW_PRO_APP__";
     const STORAGE_KEY = "bpfw_pro_state_v1";
     const ROOT_CLASS = "bpfw-root";
@@ -1656,7 +1656,7 @@
                     -webkit-backdrop-filter: blur(18px);
                     pointer-events: auto;
                     color: #10263a;
-                    user-select: none;
+                    user-select: auto;
                 }
                 .${ROOT_CLASS}-shell[data-active="true"] {
                     box-shadow:
@@ -1683,6 +1683,7 @@
                     flex-shrink: 0;
                     position: relative;
                     z-index: 6;
+                    user-select: none;
                 }
                 .${ROOT_CLASS}-shell[data-locked="true"] .${ROOT_CLASS}-header {
                     cursor: default;
@@ -1716,6 +1717,7 @@
                     color: #1c3552;
                     cursor: pointer;
                     transition: transform 0.14s ease, background 0.14s ease, opacity 0.14s ease;
+                    user-select: none;
                 }
                 .${ROOT_CLASS}-action svg {
                     width: 12px;
@@ -1743,6 +1745,25 @@
                     overflow: hidden;
                     background: rgba(255,255,255,0.1);
                     z-index: 1;
+                    user-select: auto;
+                }
+                .${ROOT_CLASS}-shell--sidebar .vp-ai-draft,
+                .${ROOT_CLASS}-shell--sidebar .vp-ai-draft *,
+                .${ROOT_CLASS}-shell--sidebar .ai-draft__wrap,
+                .${ROOT_CLASS}-shell--sidebar .ai-draft__wrap *,
+                .${ROOT_CLASS}-shell--sidebar .ai-draft__p-paragraph,
+                .${ROOT_CLASS}-shell--sidebar .ai-draft__p-sentence {
+                    -webkit-user-select: text !important;
+                    user-select: text !important;
+                }
+                .${ROOT_CLASS}-shell--sidebar .ai-draft__operate-block {
+                    pointer-events: none !important;
+                    -webkit-user-select: none !important;
+                    user-select: none !important;
+                }
+                .${ROOT_CLASS}-shell--sidebar .ai-draft__operate-block button,
+                .${ROOT_CLASS}-shell--sidebar .ai-draft__operate-block [role="button"] {
+                    pointer-events: auto !important;
                 }
                 .${ROOT_CLASS}-content > * {
                     width: 100% !important;
@@ -1870,6 +1891,7 @@
                     z-index: 12;
                     pointer-events: auto;
                     touch-action: none;
+                    user-select: none;
                     box-shadow: 0 4px 12px rgba(12, 48, 92, 0.16);
                 }
                 .${ROOT_CLASS}-resize::before {
