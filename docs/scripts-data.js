@@ -8,7 +8,7 @@
  * Fields:
  *   - id:        URL-safe identifier (used for anchor links)
  *   - name:      Display name shown in nav and cards
- *   - file:      Relative path from README HTML/ root to the detail page
+ *   - file:      Relative path from docs/ root to the detail page
  *   - desc:      One-line description shown on homepage
  *   - version:   Script version string
  *   - sites:     Target sites / match patterns

@@ -17,8 +17,7 @@
   const isHome =
     /index\.html$/.test(currentPath) ||
     currentPath === '/' ||
-    currentPath.endsWith('/README%20HTML/') ||
-    currentPath.endsWith('/README HTML/');
+    currentPath.endsWith('/docs/');
 
   /* ========== 1. Left Sidebar ========== */
   function renderSidebar() {

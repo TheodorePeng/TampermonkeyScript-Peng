@@ -12,6 +12,7 @@
   - [百度网盘增强](#百度网盘增强)
   - [YouTube 增强](#youtube-增强)
   - [英语学习与笔记导出](#英语学习与笔记导出)
+  - [学术资源](#学术资源)
   - [链接与工具](#链接与工具)
 - [安装方法](#安装方法)
 - [更新](#更新)
@@ -62,6 +63,12 @@
 | **[EudicDictExamSentenceScraper.user.js](EudicDictExamSentenceScraper.user.js)** | 自动爬取欧路词典词条页「大学英语四级六级考研真题库」中的考研真题句子，自动点击「考研」→「查看更多」加载全部内容，输出标准 Markdown 格式（含 `e.g.` 前缀、中文翻译、出处及每日英语听力 App 链接） | `dict.eudic.net/dicts/en/*` |
 | **[GetShareNoteNotionExporter.user.js](GetShareNoteNotionExporter.user.js)** | 导出 GET 分享笔记为 Notion 友好的 Markdown，支持文字记录、智能总结、 sprouts、子笔记的复制与下载 | `biji.com/note/share_note/*` |
 | **[get.js](get.js)** | GET 分享笔记导出的早期版本（v0.1.0） | `biji.com/note/share_note/*` |
+
+### 学术资源
+
+| 脚本 | 功能简介 | 适用站点 |
+|------|---------|---------|
+| **[DuxiuBookEnhancer.user.js](DuxiuBookEnhancer.user.js)** | 读秀/超星图书增强：直接显示图书 SSID/DX 号，增加存货查询、部分阅读、试读跳转、封面/书名/版权/封底一键下载 | `book.duxiu.com` / `www.szlib.org.cn` / 图书馆参考联盟 |
 
 ### 链接与工具
 
