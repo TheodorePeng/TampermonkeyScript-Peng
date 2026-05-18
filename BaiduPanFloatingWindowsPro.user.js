@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BaiduPan Floating Windows Pro
 // @namespace    https://example.local/
-// @version      1.0.10
+// @version      1.0.11
 // @description  Stable dual floating windows for Baidu Pan video pages with shell-based layout control, state persistence, and resilient re-binding.
 // @author       TheodorePeng & Codex
 // @match        *://pan.baidu.com/pfile/video*
@@ -16,12 +16,13 @@
 (() => {
     "use strict";
 
-    const APP_VERSION = "1.0.10";
+    const APP_VERSION = "1.0.11";
     const APP_KEY = "__BPFW_PRO_APP__";
     const STORAGE_KEY = "bpfw_pro_state_v1";
     const ROOT_CLASS = "bpfw-root";
     const VIEWPORT_PADDING = 0;
     const CORRECTION_DELAYS = [0, 120, 500];
+    const VIDEO_RESTORE_DELAYS = [0, 80, 180, 420, 800];
     const TAB_LABELS = ["视频", "笔记", "AI看", "课件", "文稿"];
     const PILL_SIZE = 20;
     const PILL_DRAG_THRESHOLD = 4;
@@ -109,6 +110,9 @@
     function cleanupOrphanedUi() {
         document.querySelectorAll(`.${ROOT_CLASS}, .${ROOT_CLASS}-pill, .${ROOT_CLASS}-toastStack`).forEach((node) => {
             node.remove();
+        });
+        document.querySelectorAll(`.${ROOT_CLASS}-video-repaint-pulse`).forEach((node) => {
+            node.classList.remove(`${ROOT_CLASS}-video-repaint-pulse`);
         });
     }
 
@@ -535,6 +539,7 @@
             this.documentObserver = null;
             this.windowResizeTimer = null;
             this.pendingCorrectionTimers = [];
+            this.pendingVideoRestoreTimers = [];
             this.correctionRaf = 0;
             this.correctionToken = 0;
             this.isActive = false;
@@ -589,6 +594,7 @@
         }
 
         destroy(options = {}) {
+            this.clearVideoRestoreTimers();
             this.bootstrapAbort.abort();
             this.clearCorrectionTimers();
             this.disconnectObservers();
@@ -844,6 +850,7 @@
             if (this.isActive) {
                 return true;
             }
+            this.clearVideoRestoreTimers();
             if (this.hasOldScriptConflict()) {
                 this.showToast("检测到旧版浮窗脚本已激活，请先关闭旧版。", "warn", 3200);
                 return false;
@@ -886,12 +893,15 @@
         }
 
         disable(options = {}) {
+            this.clearVideoRestoreTimers();
             if (!this.isActive) {
                 return;
             }
 
             this.clearCorrectionTimers();
             this.disconnectObservers();
+
+            const playerSnapshot = this.capturePlaybackSnapshot(this.registry.get("player"));
 
             Array.from(this.registry.values()).forEach((entry) => {
                 this.restoreTarget(entry);
@@ -908,6 +918,7 @@
             this.state = stateStore.patch({ enabled: false });
             this.updatePillState();
             window.dispatchEvent(new Event("resize"));
+            this.scheduleVideoRestoreRecovery(playerSnapshot, "disable");
 
             if (!options.quiet) {
                 this.showToast("双浮窗工作区已关闭。", "info", 2000);
@@ -920,6 +931,9 @@
             if (!shell || !entry) {
                 return;
             }
+            const shouldRecoverPlayer = key === "player";
+            const playerSnapshot = shouldRecoverPlayer ? this.capturePlaybackSnapshot(entry) : null;
+            const closingLastShell = this.shells.size === 1;
             this.restoreTarget(entry);
             shell.destroy();
             this.shells.delete(key);
@@ -927,12 +941,18 @@
             this.visibleKeys.delete(key);
             this.showToast(`${TARGETS[key].title}已恢复到页面原位。`, "info", 1800);
 
-            if (this.shells.size === 0) {
+            if (closingLastShell) {
                 this.disable({ quiet: true });
+                if (shouldRecoverPlayer) {
+                    this.scheduleVideoRestoreRecovery(playerSnapshot, "close-final-player");
+                }
                 this.showToast("所有浮窗都已关闭，页面已恢复原样。", "info", 2200);
                 return;
             }
 
+            if (shouldRecoverPlayer) {
+                this.scheduleVideoRestoreRecovery(playerSnapshot, `close-${key}`);
+            }
             this.scheduleCorrection(`close-${key}`);
         }
 
@@ -993,6 +1013,182 @@
             this.state = stateStore.patch({
                 [`${key}Locked`]: locked,
             });
+        }
+
+        findPrimaryVideo(root = document) {
+            const scope = root || document;
+            if (scope instanceof HTMLVideoElement) {
+                return scope;
+            }
+            const preferred = scope.querySelector?.('video.vjs-tech[data-vcaptions-target-video="1"]');
+            if (preferred instanceof HTMLVideoElement) {
+                return preferred;
+            }
+
+            const playerRootVideo = scope.matches?.(".drager_left")
+                ? scope.querySelector?.("video.vjs-tech")
+                : scope.querySelector?.(".drager_left video.vjs-tech");
+            if (playerRootVideo instanceof HTMLVideoElement) {
+                return playerRootVideo;
+            }
+
+            const videos = Array.from(scope.querySelectorAll?.("video") || []);
+            return videos.find((video) => {
+                return video instanceof HTMLVideoElement
+                    && isVisibleNode(video)
+                    && Boolean(video.currentSrc || video.src);
+            }) || videos.find((video) => {
+                return video instanceof HTMLVideoElement && isVisibleNode(video);
+            }) || null;
+        }
+
+        getVideoPlayer(video) {
+            if (!(video instanceof HTMLVideoElement)) {
+                return null;
+            }
+            const container = video.closest(".video-js");
+            return video.player || container?.player || null;
+        }
+
+        capturePlaybackSnapshot(entry) {
+            const root = entry?.node instanceof HTMLElement ? entry.node : document;
+            const video = this.findPrimaryVideo(root) || this.findPrimaryVideo(document);
+            if (!video) {
+                return null;
+            }
+
+            const player = this.getVideoPlayer(video);
+            const playerPaused = typeof player?.paused === "function" ? player.paused() : video.paused;
+            const playerCurrentTime = typeof player?.currentTime === "function" ? player.currentTime() : video.currentTime;
+            const currentTime = Number.isFinite(playerCurrentTime) ? playerCurrentTime : video.currentTime;
+
+            return {
+                wasPlaying: !playerPaused && !video.ended,
+                currentTime: Number.isFinite(currentTime) ? currentTime : 0,
+                playbackRate: Number.isFinite(video.playbackRate) ? video.playbackRate : 1,
+                muted: video.muted,
+                volume: Number.isFinite(video.volume) ? video.volume : 1,
+                src: video.currentSrc || video.src || "",
+            };
+        }
+
+        clearVideoRestoreTimers() {
+            this.pendingVideoRestoreTimers.forEach((timer) => window.clearTimeout(timer));
+            this.pendingVideoRestoreTimers = [];
+            document.querySelectorAll(`.${ROOT_CLASS}-video-repaint-pulse`).forEach((element) => {
+                element.classList.remove(`${ROOT_CLASS}-video-repaint-pulse`);
+            });
+        }
+
+        scheduleVideoRestoreRecovery(snapshot, reason) {
+            if (!snapshot) {
+                return;
+            }
+
+            VIDEO_RESTORE_DELAYS.forEach((delayMs) => {
+                const timer = window.setTimeout(() => {
+                    this.pendingVideoRestoreTimers = this.pendingVideoRestoreTimers.filter((pendingTimer) => pendingTimer !== timer);
+                    this.runVideoRestoreRecovery(snapshot, reason).catch((error) => {
+                        console.warn(`[BPFW] Video restore recovery failed (${reason}):`, error);
+                    });
+                }, delayMs);
+                this.pendingVideoRestoreTimers.push(timer);
+            });
+        }
+
+        async runVideoRestoreRecovery(snapshot, reason) {
+            await raf();
+            await raf();
+
+            const video = this.findPrimaryVideo(document);
+            if (!video) {
+                return;
+            }
+
+            this.forceVideoLayoutRead(video);
+            this.pulseVideoRepaint(video);
+            this.notifyVideoPlayerResize(video, reason);
+            this.restorePlaybackState(video, snapshot);
+        }
+
+        forceVideoLayoutRead(video) {
+            const targets = [
+                document.querySelector(".drager_left"),
+                video.closest(".vp-video__player"),
+                video.closest(".video-js"),
+                video,
+            ];
+            targets.forEach((element) => {
+                if (element instanceof HTMLElement) {
+                    element.getBoundingClientRect();
+                    element.offsetWidth;
+                    element.offsetHeight;
+                    window.getComputedStyle(element).transform;
+                }
+            });
+        }
+
+        pulseVideoRepaint(video) {
+            const pulseTargets = [
+                video.closest(".vp-video__player"),
+                video.closest(".video-js"),
+            ].filter((element) => element instanceof HTMLElement);
+
+            pulseTargets.forEach((element) => {
+                element.classList.add(`${ROOT_CLASS}-video-repaint-pulse`);
+            });
+
+            window.requestAnimationFrame(() => {
+                pulseTargets.forEach((element) => {
+                    element.classList.remove(`${ROOT_CLASS}-video-repaint-pulse`);
+                });
+            });
+        }
+
+        notifyVideoPlayerResize(video, reason) {
+            const player = this.getVideoPlayer(video);
+            if (!player) {
+                window.dispatchEvent(new Event("resize"));
+                return;
+            }
+
+            try {
+                player.resizeManager?.resizeHandler?.();
+                if (typeof player.trigger === "function") {
+                    player.trigger("playerresize");
+                    player.trigger("resize");
+                    player.trigger("componentresize");
+                }
+            } catch (error) {
+                console.warn(`[BPFW] Failed to notify video player resize (${reason}):`, error);
+            }
+
+            window.dispatchEvent(new Event("resize"));
+        }
+
+        restorePlaybackState(video, snapshot) {
+            try {
+                video.playbackRate = snapshot.playbackRate;
+                video.muted = snapshot.muted;
+                video.volume = snapshot.volume;
+            } catch (error) {
+                console.warn("[BPFW] Failed to restore video playback properties:", error);
+            }
+
+            const player = this.getVideoPlayer(video);
+            const drift = Math.abs(video.currentTime - snapshot.currentTime);
+            if (!snapshot.wasPlaying) {
+                return;
+            }
+
+            if (video.paused && drift < 0.5) {
+                const playResult = typeof player?.play === "function" ? player.play() : video.play();
+                if (playResult && typeof playResult.catch === "function") {
+                    playResult.catch((error) => {
+                        console.warn("[BPFW] Failed to resume video after restore:", error);
+                    });
+                }
+            }
         }
 
         focusShell(key) {
@@ -1770,6 +1966,11 @@
                     height: 100% !important;
                     min-width: 0 !important;
                     min-height: 0 !important;
+                }
+                .${ROOT_CLASS}-video-repaint-pulse {
+                    transform: translateZ(0) !important;
+                    backface-visibility: hidden !important;
+                    will-change: transform !important;
                 }
                 .${ROOT_CLASS}-shell--sidebar .vp-aside {
                     display: flex !important;
