@@ -47,6 +47,7 @@
 | **[BaiduPanSubtitlePlayer.user.js](BaiduPanSubtitlePlayer.user.js)** | 浮动字幕面板，支持加载本地 SRT/VTT 字幕、与视频同步、点击跳转、智能滚动、双语模糊与切换 | `pan.baidu.com/pfile/video` |
 | **[BaiduPan Subtitle Checker&Download](BaiduPan%20Subtitle%20Checker%26Download-1.0.user.js)** | 检测网络请求中的 `netdisk-subtitle` 关键字并自动下载字幕文件 | `pan.baidu.com/*` |
 | **[Move subtitle to floating window.js](Move%20subtitle%20to%20floating%20window.js)** | 将视频字幕移动到独立的浮动窗口中显示 | 百度网盘视频页 |
+| **[BaiduEasyStudySingleHtmlExporter.user.js](BaiduEasyStudySingleHtmlExporter.user.js)** | 将百度网盘「简单学习」页面导出为单个离线 HTML 文件，自动内联 CSS、JS、字体与图片，支持浮动导出按钮与进度提示 | `pan.baidu.com/embed/easy-study/detail*` |
 
 ### YouTube 增强
 
