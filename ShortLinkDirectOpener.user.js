@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ShortLink External Scheme Opener
 // @namespace    http://tampermonkey.net/
-// @version      0.1.2
+// @version      0.1.3
 // @description  直接打开 ShortLink Studio 包装的外部协议链接，并自动关闭 ShortLink 中转页。
 // @author       TheodorePeng
 // @match        https://*.notion.site/*
@@ -26,6 +26,7 @@
         'zoom',
         'figma',
         'zotero',
+        'kmtrigger',
         'hook',
         'things',
         'craft'
@@ -39,6 +40,7 @@
         zoom: 'Zoom',
         figma: 'Figma',
         zotero: 'Zotero',
+        kmtrigger: 'Keyboard Maestro',
         hook: 'Hookmark',
         things: 'Things',
         craft: 'Craft'
