@@ -127,7 +127,7 @@
             }
         }
 
-        return lines.length > 0 ? lines.join('\n') : null;
+        return lines.length > 0 ? lines.join('\n\n') : null;
     }
 
     function handleCopy(event) {
