@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili Chapter Copier
 // @namespace    http://tampermonkey.net/
-// @version      0.1.0
+// @version      0.1.1
 // @description  在 Bilibili 视频章节面板添加“复制”按钮，一键复制所有章节的时间范围和名称。
 // @author       TheodorePeng
 // @match        https://www.bilibili.com/video/*
