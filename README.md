@@ -11,6 +11,7 @@
   - [搜索与导航](#搜索与导航)
   - [百度网盘增强](#百度网盘增强)
   - [YouTube 增强](#youtube-增强)
+  - [Bilibili 增强](#bilibili-增强)
   - [英语学习与笔记导出](#英语学习与笔记导出)
   - [学术资源](#学术资源)
   - [链接与工具](#链接与工具)
@@ -55,6 +56,12 @@
 |------|---------|---------|
 | **[YouTube-to-Bilibili-Jump.user.js](YouTube-to-Bilibili-Jump.user.js)** | 在 YouTube 视频页左上角添加极小半透明按钮，左键直接跳转 B 站第一个搜索结果，右键打开可编辑搜索词面板 | `youtube.com/watch*` |
 | **[YouTubeChapterFirstFrameDownloader.user.js](YouTubeChapterFirstFrameDownloader.user.js)** | 根据 YouTube 视频描述中的时间戳章节，下载每个章节的首帧截图 | `youtube.com/watch*` |
+
+### Bilibili 增强
+
+| 脚本 | 功能简介 | 适用站点 |
+|------|---------|---------|
+| **[BilibiliChapterCopier.user.js](BilibiliChapterCopier.user.js)** | 在视频章节面板添加“复制”按钮，一键复制所有章节的时间范围和名称 | `bilibili.com/video/*` |
 
 ### 英语学习与笔记导出
 
