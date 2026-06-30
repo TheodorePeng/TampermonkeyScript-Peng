@@ -304,13 +304,23 @@
      * @param {string} text
      * @returns {boolean}
      */
-    function clickByText(text) {
-        const all = document.querySelectorAll('*');
+    function clickByText(text, options = {}) {
+        const { containerSelector = null, preferParentClass = null } = options;
+        const root = containerSelector ? (document.querySelector(containerSelector) || document) : document;
+        const all = root.querySelectorAll('*');
         for (const el of all) {
-            if (getDirectText(el) === text) {
-                el.click();
-                return true;
+            if (getDirectText(el) !== text) continue;
+            // 跳过不可见
+            const s = window.getComputedStyle(el);
+            if (s.display === 'none' || s.visibility === 'hidden' || parseFloat(s.opacity || '1') === 0) continue;
+            // 命中 SPAN 且有语义父容器时，回退到父容器（百度网盘 tab 结构）
+            let target = el;
+            if (el.tagName === 'SPAN' && preferParentClass) {
+                const parent = el.closest(preferParentClass);
+                if (parent) target = parent;
             }
+            target.click();
+            return true;
         }
         return false;
     }
@@ -536,7 +546,7 @@
     async function expandPlaylist() {
         showToast('正在展开播放列表...', 'info');
         // 第一步：点击"视频" tab 切换到视频列表
-        const videoTabClicked = clickByText('视频');
+        const videoTabClicked = clickByText('视频', { preferParentClass: '.vp-tabs__header-item' });
         if (videoTabClicked) {
             showToast('已点击"视频"tab，切换中...', 'info');
             await sleep(1500);
@@ -544,7 +554,7 @@
             showToast('未找到"视频"tab，将直接尝试展开', 'warn');
         }
         // 第二步：点击"查看全部"展开完整播放列表
-        const expanded = clickByText('查看全部');
+        const expanded = clickByText('查看全部', { preferParentClass: '.vp-aside-box__module' });
         if (expanded) {
             await sleep(1000);
             showToast('播放列表已展开', 'success');
@@ -607,7 +617,7 @@
                 (i / labels.length) * 100
             );
             const delaySec = config.delays[label] || 1;
-            const clicked = clickByText(label);
+            const clicked = clickByText(label, { preferParentClass: '.vp-tabs__header-item' });
             showToast(
                 (clicked ? '&#10004; ' : '&#9888; ') + label + (clicked ? ' 已点击，停留 ' + delaySec + 's' : ' 未找到'),
                 clicked ? 'success' : 'warn', 1000
