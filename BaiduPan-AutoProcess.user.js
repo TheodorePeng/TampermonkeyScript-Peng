@@ -618,21 +618,74 @@
     async function goToNextVideo() {
         await sleep(config.pageLoadDelaySec * 1000);
         const prevUrl = window.location.href;
-        // 视频播放器内的"下一集"按钮（icon 按钮，用 XPath 定位）
-        const nextBtn = document.evaluate(
-            '//*[@id="vjs_video_594"]/div[7]/section/div[1]/div[3]/div/i',
-            document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null
-        ).singleNodeValue;
+
+        // 1) 先暂停视频，确保控制条不会因 hover 状态变化而 opacity=0
+        const video = findPlayerVideoElement();
+        const wasPaused = !!(video && video.paused);
+        if (video && !wasPaused) {
+            try { video.pause(); } catch (e) {}
+        }
+
+        // 2) 用属性选择器找"下一集"按钮（不依赖动态 vjs_video_* ID）
+        const nextBtn = await waitForElement(
+            () => document.querySelector('[title="下一集"]'),
+            { timeoutMs: 5000, intervalMs: 200, description: '下一集按钮' }
+        );
+
         if (!nextBtn) {
-            showToast('&#10060; 未找到"下一集"按钮', 'error');
+            showToast('&#10060; 未找到"下一集"按钮（已等 5s）', 'error');
             return false;
         }
-        nextBtn.click();
+
+        // 3) 等待控制条可见（opacity > 0.5），最多 3s
+        await waitForElement(
+            () => (isControlBarVisible(nextBtn) ? nextBtn : null),
+            { timeoutMs: 3000, intervalMs: 150, description: '控制条可见' }
+        );
+
+        // 4) 点击（最多 2 次尝试，第二次前 hover 触发控制条显示）
+        let clicked = false;
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+                nextBtn.click();
+                clicked = true;
+                break;
+            } catch (e) {
+                if (attempt === 1) {
+                    nextBtn.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+                    if (nextBtn.parentElement) {
+                        nextBtn.parentElement.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+                    }
+                    await delay(300);
+                } else {
+                    showToast('&#10060; 点击"下一集"失败：' + e.message, 'error');
+                    return false;
+                }
+            }
+        }
+        if (!clicked) return false;
         showToast('&#9167; 已点击"下一集"', 'info', 1000);
-        await sleep(config.pageLoadDelaySec * 1000);
-        if (window.location.href === prevUrl) {
+
+        // 5) 等待 URL 实际变更（取代固定 sleep）
+        const urlChanged = await waitForElement(
+            () => (window.location.href !== prevUrl ? true : null),
+            { timeoutMs: 8000, intervalMs: 250, description: 'URL 变更' }
+        );
+        if (!urlChanged) {
             showToast('&#9888; 已停在最后一集，无法继续', 'warn');
             return false;
+        }
+
+        // 6) 等新页面加载（DOM ready + 视频元素就位）
+        await waitForElement(() => findPlayerVideoElement(), {
+            timeoutMs: 5000,
+            intervalMs: 200,
+            description: '新视频元素',
+        });
+
+        // 7) 恢复原播放状态（如果原本在播放）
+        if (video && !wasPaused) {
+            try { await video.play(); } catch (e) {}
         }
         return true;
     }
