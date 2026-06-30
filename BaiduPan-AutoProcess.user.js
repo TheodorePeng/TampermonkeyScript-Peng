@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Baidupan 批量触发AI内容生成
 // @namespace    http://tampermonkey.net/
-// @version      1.9.1
+// @version      1.9.2
 // @description  批量点击百度网盘视频的文稿/课件/AI看按钮，支持按键交互控制
 // @author       TheodorePeng
 // @match        *://pan.baidu.com/pfile/video*
