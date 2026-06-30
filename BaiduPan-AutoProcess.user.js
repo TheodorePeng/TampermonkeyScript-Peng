@@ -279,12 +279,27 @@
         } catch { return {}; }
     }
 
-    function markVideoProcessed(path) {
+    function markVideoProcessed(key) {
         try {
             const map = getProcessedVideos();
-            map[path] = Date.now();
+            map[key] = Date.now();
             localStorage.setItem(PROCESS_KEY, JSON.stringify(map));
         } catch {}
+    }
+
+    function getVideoKey() {
+        try {
+            const params = new URLSearchParams(window.location.search);
+            const path = decodeURIComponent(params.get('path') || '');
+            return path || window.location.pathname;
+        } catch { return window.location.href; }
+    }
+
+    function isVideoProcessed(key) {
+        try {
+            const map = getProcessedVideos();
+            return Boolean(map[key]);
+        } catch { return false; }
     }
 
     /**
@@ -721,7 +736,7 @@
         for (let i = 0; i < config.loopCount; i++) {
             currentVideoIndex = i;
             currentVideoName = getCurrentVideoName();
-            currentUrl = window.location.href;
+            currentUrl = getVideoKey();
             const progress = (i / config.loopCount) * 100;
             updateStatusCard([
                 { label: '文稿', status: '' },
@@ -731,7 +746,7 @@
             ], progress);
             showToast('&#128449; 第 ' + (i + 1) + ' / ' + config.loopCount + ': ' + currentVideoName, 'info', 2000);
             await clickThreeButtons();
-            markVideoProcessed(currentUrl);
+            if (!isVideoProcessed(currentUrl)) markVideoProcessed(currentUrl);
             updateStatusCard([
                 { label: '文稿', status: 'done' },
                 { label: '课件', status: 'done' },
