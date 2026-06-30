@@ -290,6 +290,36 @@
         }
     }
 
+    /**
+     * 把焦点从笔记 iframe 的可编辑元素移出，并转移到父 doc 的可聚焦元素
+     * 解决：点击 AI 笔记模板后，光标停在 .ql-editor（contenteditable=true）里，
+     * 用户按 Y/N 时键事件被输入框吞掉。blur + 父 doc focus 后键事件才能被父 onkeydown 监听到。
+     * best-effort：任何一步失败都不抛错。
+     */
+    function blurNoteEditorFocus() {
+        let acted = false;
+        // 1) blur iframe 内的活动元素（让光标视觉上离开输入框）
+        try {
+            const doc = getNoteIframeDocument();
+            if (doc && doc.activeElement && typeof doc.activeElement.blur === 'function') {
+                doc.activeElement.blur();
+                acted = true;
+            }
+        } catch (e) {}
+        // 2) 把焦点转移到父 doc 的可聚焦元素，让 keydown 在父 doc 上派发
+        // 优先用 #bap-trigger-btn（脚本启动时就注入的按钮，始终存在）；
+        // 备用 document.body + tabindex=-1（body 默认不可聚焦）
+        try {
+            const target = document.getElementById('bap-trigger-btn') || document.body;
+            if (target === document.body && !target.hasAttribute('tabindex')) {
+                target.setAttribute('tabindex', '-1');
+            }
+            target.focus({ preventScroll: true });
+            acted = true;
+        } catch (e) {}
+        return acted;
+    }
+
     async function waitForElement(predicate, options = {}) {
         const { timeoutMs = 5000, intervalMs = 200, description = 'element' } = options;
         const deadline = Date.now() + timeoutMs;
