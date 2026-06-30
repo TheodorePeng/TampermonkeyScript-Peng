@@ -519,16 +519,26 @@
             '<div class="bap-row"><div><label>下一集后等待</label><div class="bap-hint">点击下一集后等多久(秒)</div></div><input type="number" class="bap-input" id="bap-page-delay" value="' + config.pageLoadDelaySec + '" min="0" max="30" step="0.5"></div>' +
             '<div class="bap-row"><div><label>继续 / 停止 按键</label><div class="bap-hint">按键控制是否跳到下一集</div></div><div style="display:flex;align-items:center;gap:6px;"><input type="text" class="bap-input" id="bap-continue-key" value="' + config.continueKey + '" maxlength="1" style="width:40px;"><span style="color:#999;font-size:13px;">/</span><input type="text" class="bap-input" id="bap-stop-key" value="' + config.stopKey + '" maxlength="1" style="width:40px;"></div></div>' +
             '<div class="bap-row"><div><label>按键超时</label><div class="bap-hint">等待按键的超时时间(秒)</div></div><input type="number" class="bap-input" id="bap-key-timeout" value="' + config.keyTimeoutSec + '" min="5" max="300" step="5"></div>' +
-            '<div style="margin: 16px 0 8px; font-size:12px; color:#555; font-weight:600;">各按钮点击后等待(秒)</div>' +
-            '<div class="bap-row"><div><label>文稿</label></div><input type="number" class="bap-input" id="bap-delay-doc" value="' + (config.delays['文稿'] || 1) + '" min="0" max="30" step="0.5"></div>' +
-            '<div class="bap-row"><div><label>课件</label></div><input type="number" class="bap-input" id="bap-delay-ppt" value="' + (config.delays['课件'] || 1) + '" min="0" max="30" step="0.5"></div>' +
-            '<div class="bap-row"><div><label>AI看</label></div><input type="number" class="bap-input" id="bap-delay-ai" value="' + (config.delays['AI看'] || 1) + '" min="0" max="30" step="0.5"></div>' +
-            '<div class="bap-row"><div><label>笔记</label></div><input type="number" class="bap-input" id="bap-delay-note" value="' + (config.delays['笔记'] || 1) + '" min="0" max="30" step="0.5"></div>' +
+            '<div style="margin: 16px 0 8px; font-size:12px; color:#555; font-weight:600;">各按钮启用与点击后等待</div>' +
+            '<div class="bap-row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="bap-enable-doc" data-bap-key="文稿" ' + (config.enabled['文稿'] ? 'checked' : '') + ' style="width:16px;height:16px;cursor:pointer;"><span>文稿</span></label><input type="number" class="bap-input" id="bap-delay-doc" value="' + (config.delays['文稿'] || 1) + '" min="0" max="30" step="0.5"></div>' +
+            '<div class="bap-row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="bap-enable-ppt" data-bap-key="课件" ' + (config.enabled['课件'] ? 'checked' : '') + ' style="width:16px;height:16px;cursor:pointer;"><span>课件</span></label><input type="number" class="bap-input" id="bap-delay-ppt" value="' + (config.delays['课件'] || 1) + '" min="0" max="30" step="0.5"></div>' +
+            '<div class="bap-row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="bap-enable-ai" data-bap-key="AI看" ' + (config.enabled['AI看'] ? 'checked' : '') + ' style="width:16px;height:16px;cursor:pointer;"><span>AI看</span></label><input type="number" class="bap-input" id="bap-delay-ai" value="' + (config.delays['AI看'] || 1) + '" min="0" max="30" step="0.5"></div>' +
+            '<div class="bap-row"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="bap-enable-note" data-bap-key="笔记" ' + (config.enabled['笔记'] ? 'checked' : '') + ' style="width:16px;height:16px;cursor:pointer;"><span>笔记</span></label><input type="number" class="bap-input" id="bap-delay-note" value="' + (config.delays['笔记'] || 1) + '" min="0" max="30" step="0.5"></div>' +
             '</div>' +
             '<div class="bap-modal-footer"><button class="bap-btn-primary" id="bap-start-btn">&#128640; 开始运行</button></div>' +
             '</div>';
 
         document.body.appendChild(overlay);
+
+        // 复选框记忆功能：每次切换立即写入 GM 存储，不依赖"开始运行"按钮
+        overlay.addEventListener('change', function(e) {
+            const t = e.target;
+            if (!(t && t.matches && t.matches('input[type="checkbox"][data-bap-key]'))) return;
+            const key = t.getAttribute('data-bap-key');
+            if (!key) return;
+            config.enabled[key] = t.checked;
+            saveSettings();
+        });
 
         const escHandler = function(e) {
             if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); }
@@ -550,6 +560,12 @@
                 '课件': parseFloat(document.getElementById('bap-delay-ppt').value) || 1,
                 'AI看': parseFloat(document.getElementById('bap-delay-ai').value) || 1,
                 '笔记': parseFloat(document.getElementById('bap-delay-note').value) || 1,
+            };
+            config.enabled = {
+                '文稿': document.getElementById('bap-enable-doc').checked,
+                '课件': document.getElementById('bap-enable-ppt').checked,
+                'AI看': document.getElementById('bap-enable-ai').checked,
+                '笔记': document.getElementById('bap-enable-note').checked,
             };
             saveSettings();
             // run() 内部已管理 onkeydown 监听器，这里只需移除 escHandler
