@@ -690,6 +690,47 @@
         });
     }
 
+    /**
+     * 笔记 tab 被点击后调用：等 iframe 就绪 → 检测空态 → 自动点第一个 AI 模板的 img
+     * 仅当笔记真的为空（.ql-blank + 模板区可见）才触发；否则静默退出。
+     */
+    async function maybeAutoClickNoteTemplate() {
+        // 1) 等 iframe 就绪（同源，最坏 3s）
+        const doc = await waitForElement(
+            () => getNoteIframeDocument(),
+            { timeoutMs: 3000, intervalMs: 150, description: 'noteIframe ready' }
+        );
+        if (!doc) {
+            showToast('&#9888; 笔记 iframe 未就绪，跳过 AI 模板自动点击', 'warn', 1500);
+            return;
+        }
+        // 2) 等笔记为空状态稳定（编辑器 Quill blank 出现 + 模板区可见），给百度 SPA ~2s
+        const empty = await waitForElement(
+            () => (isNoteEditorEmpty(doc) ? true : null),
+            { timeoutMs: 2000, intervalMs: 200, description: '笔记空态' }
+        );
+        if (!empty) {
+            showToast('&#8505; 笔记非空，跳过 AI 模板自动点击', 'info', 1200);
+            return;
+        }
+        // 3) 等 AI 模板 img 真正渲染（百度 CDN 图加载可能慢半拍）
+        const imgReady = await waitForElement(
+            () => doc.querySelector('.wp-note-template-container__list--item .wp-note-template-container__list--img'),
+            { timeoutMs: 3000, intervalMs: 150, description: 'AI 模板 img' }
+        );
+        if (!imgReady) {
+            showToast('&#9888; 未找到图文笔记图标，跳过自动点击', 'warn', 1500);
+            return;
+        }
+        // 4) 点 img
+        const clicked = autoClickFirstNoteTemplateImage(doc);
+        if (clicked) {
+            showToast('&#9989; 已自动点击"图文笔记"图标，AI 开始生成', 'success', 2000);
+        } else {
+            showToast('&#9888; 图文笔记图标 click 失败', 'error', 1500);
+        }
+    }
+
     async function clickThreeButtons() {
         const labels = ['文稿', '课件', 'AI看', '笔记'];
         const allSkipped = labels.every((l) => config.enabled[l] === false);
@@ -732,6 +773,12 @@
                 (clicked ? '&#10004; ' : '&#9888; ') + label + (clicked ? ' 已点击，停留 ' + delaySec + 's' : ' 未找到'),
                 clicked ? 'success' : 'warn', 1000
             );
+
+            // 笔记 tab 被成功点击 → 触发 AI 模板自动选择
+            if (label === '笔记' && clicked) {
+                await maybeAutoClickNoteTemplate();
+            }
+
             await interruptibleSleep(delaySec * 1000);
         }
         // 收尾：所有 enabled 的标 done、其余保持 skipped
