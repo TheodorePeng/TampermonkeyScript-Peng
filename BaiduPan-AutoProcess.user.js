@@ -250,6 +250,46 @@
         return candidates[0] || null;
     }
 
+    function getNoteIframeDocument() {
+        const iframe = document.getElementById('noteIframe');
+        if (!iframe || !iframe.contentDocument) return null;
+        try {
+            // 轻量探测，确认跨帧 ready
+            if (!iframe.contentDocument.querySelector('html')) return null;
+            return iframe.contentDocument;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function isNoteEditorEmpty(doc) {
+        if (!doc) return false;
+        const qlBlank = doc.querySelector('.ql-editor.ql-blank');
+        const tplContainer = doc.querySelector('.wp-note-template-container');
+        if (!tplContainer) return !!qlBlank;
+        const win = doc.defaultView || window;
+        const r = tplContainer.getBoundingClientRect();
+        const s = win.getComputedStyle(tplContainer);
+        const visible = r.width > 0 && r.height > 0
+            && s.display !== 'none'
+            && s.visibility !== 'hidden'
+            && parseFloat(s.opacity || '1') > 0;
+        return visible && !!qlBlank;
+    }
+
+    function autoClickFirstNoteTemplateImage(doc) {
+        if (!doc) return false;
+        // 用户明确要求：只点 img，不点 hover 才出现的 .wp-note-template-container__operator
+        const firstImg = doc.querySelector('.wp-note-template-container__list--item .wp-note-template-container__list--img');
+        if (!firstImg) return false;
+        try {
+            firstImg.click();
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
     async function waitForElement(predicate, options = {}) {
         const { timeoutMs = 5000, intervalMs = 200, description = 'element' } = options;
         const deadline = Date.now() + timeoutMs;
