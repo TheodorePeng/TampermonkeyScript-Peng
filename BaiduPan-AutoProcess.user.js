@@ -213,6 +213,47 @@
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
+    function delay(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    function isVisibleNode(node) {
+        if (!(node instanceof HTMLElement)) return false;
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+    }
+
+    function isControlBarVisible(node) {
+        if (!isVisibleNode(node)) return false;
+        const bar = node.closest('.vp-video__control-bar');
+        if (!bar) return isVisibleNode(node);
+        const op = parseFloat(window.getComputedStyle(bar).opacity || '1');
+        return op > 0.5;
+    }
+
+    function findPlayerVideoElement() {
+        const scope = document.querySelector('.drager_left') || document;
+        const videos = Array.from(scope.querySelectorAll('video'));
+        const visible = videos.filter(isVisibleNode);
+        const candidates = visible.length ? visible : videos;
+        candidates.sort((a, b) => {
+            const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+            return (rb.width * rb.height) - (ra.width * ra.height);
+        });
+        return candidates[0] || null;
+    }
+
+    async function waitForElement(predicate, options = {}) {
+        const { timeoutMs = 5000, intervalMs = 200, description = 'element' } = options;
+        const deadline = Date.now() + timeoutMs;
+        while (Date.now() < deadline) {
+            const el = predicate();
+            if (el) return el;
+            await delay(intervalMs);
+        }
+        return null;
+    }
+
     function loadSettings() {
         try {
             const raw = GM_getValue(LS_KEY);
