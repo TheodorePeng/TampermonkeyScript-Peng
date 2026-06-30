@@ -117,6 +117,7 @@
         .bap-status-item.bap-done { color: #34a853; }
         .bap-status-item.bap-waiting { color: #fbbc04; }
         .bap-status-item.bap-stopped { color: #ea4335; }
+        .bap-status-item.bap-skipped { color: #999; text-decoration: line-through; }
         .bap-key-hint-box { margin-top: 10px; padding: 8px 10px; background: #f8f8f8; border-radius: 8px; font-size: 12px; color: #666; text-align: center; }
         .bap-key-hint-box strong { color: #333; }
         .bap-progress-bar { width: 100%; height: 4px; background: #e0e0e0; border-radius: 2px; margin-top: 10px; overflow: hidden; }
@@ -400,6 +401,7 @@
             if (item.status === 'done') { cls += ' bap-done'; icon = '&#10004;'; }
             else if (item.status === 'waiting') { cls += ' bap-waiting'; icon = '&#8987;'; }
             else if (item.status === 'stopped') { cls += ' bap-stopped'; icon = '&#9940;'; }
+            else if (item.status === 'skipped') { cls += ' bap-skipped'; icon = '&#8856;'; }
             html += '<div class="' + cls + '"><span class="bap-icon">' + icon + '</span>' + item.label + '</div>';
         }
         if (progress !== undefined) {
@@ -650,18 +652,40 @@
 
     async function clickThreeButtons() {
         const labels = ['文稿', '课件', 'AI看', '笔记'];
+        const allSkipped = labels.every((l) => config.enabled[l] === false);
+        if (allSkipped) {
+            showToast('&#9888; 4 个按钮均未启用，无可执行操作', 'warn', 3000);
+            updateStatusCard(
+                labels.map((l) => ({ label: l, status: 'skipped' })),
+                100
+            );
+            await sleep(1000);
+            return;
+        }
+
         for (let i = 0; i < labels.length; i++) {
             if (gInterruptKey) break; // 外部已收到停止信号，直接退出
             const label = labels[i];
-            const status = labels.map((_, idx) => {
+            const isEnabled = config.enabled[label] !== false;
+
+            // 状态卡渲染
+            const status = labels.map((l, idx) => {
+                if (!config.enabled[l]) return 'skipped';
                 if (idx < i) return 'done';
-                if (idx === i) return 'waiting';
+                if (idx === i) return isEnabled ? 'waiting' : 'skipped';
                 return '';
             });
             updateStatusCard(
                 labels.map((l, idx) => ({ label: l, status: status[idx] })),
                 (i / labels.length) * 100
             );
+
+            // 跳过未启用按钮：仅渲染状态、不点击、不等待
+            if (!isEnabled) {
+                showToast('&#9208; ' + label + ' 已跳过（未启用）', 'info', 800);
+                continue;
+            }
+
             const delaySec = config.delays[label] || 1;
             const clicked = clickByText(label, { preferParentClass: '.vp-tabs__header-item' });
             showToast(
@@ -670,8 +694,9 @@
             );
             await interruptibleSleep(delaySec * 1000);
         }
+        // 收尾：所有 enabled 的标 done、其余保持 skipped
         updateStatusCard(
-            labels.map(l => ({ label: l, status: 'done' })),
+            labels.map((l) => ({ label: l, status: config.enabled[l] === false ? 'skipped' : 'done' })),
             100
         );
     }
