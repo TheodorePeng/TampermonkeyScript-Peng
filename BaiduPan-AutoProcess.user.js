@@ -756,6 +756,8 @@
         const clicked = autoClickFirstNoteTemplateImage(doc);
         if (clicked) {
             showToast('&#9989; 已自动点击"图文笔记"图标，AI 开始生成', 'success', 2000);
+            // 5) 立即退出输入框焦点（避免 Y/N 被 .ql-editor 当文字吞掉）
+            blurNoteEditorFocus();
         } else {
             showToast('&#9888; 图文笔记图标 click 失败', 'error', 1500);
         }
