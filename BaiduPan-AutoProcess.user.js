@@ -523,7 +523,14 @@
 
         document.body.appendChild(overlay);
 
-        document.getElementById('bap-modal-close').addEventListener('click', function() { overlay.remove(); });
+        const escHandler = function(e) {
+            if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); }
+        };
+
+        document.getElementById('bap-modal-close').addEventListener('click', function() {
+            document.removeEventListener('keydown', escHandler);
+            overlay.remove();
+        });
 
         document.getElementById('bap-start-btn').addEventListener('click', function() {
             config.loopCount = parseInt(document.getElementById('bap-loop-count').value) || 14;
@@ -538,11 +545,12 @@
                 '笔记': parseFloat(document.getElementById('bap-delay-note').value) || 1,
             };
             saveSettings();
+            // run() 内部已管理 onkeydown 监听器，这里只需移除 escHandler
+            document.removeEventListener('keydown', escHandler);
             overlay.remove();
             run();
         });
 
-        const escHandler = function(e) { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); } };
         document.addEventListener('keydown', escHandler);
     }
 
@@ -727,55 +735,61 @@
         if (isRunning) { showToast('脚本已在运行中...', 'warn'); return; }
         isRunning = true;
         document.addEventListener('keydown', onKeydown);
-        currentVideoName = getCurrentVideoName();
-        showToast('&#128640; 开始运行: ' + currentVideoName, 'info');
-        await expandPlaylist();
-        await sleep(1000);
-        showStatusCard();
-
-        for (let i = 0; i < config.loopCount; i++) {
-            currentVideoIndex = i;
+        try {
             currentVideoName = getCurrentVideoName();
-            currentUrl = getVideoKey();
-            const progress = (i / config.loopCount) * 100;
-            updateStatusCard([
-                { label: '文稿', status: '' },
-                { label: '课件', status: '' },
-                { label: 'AI看', status: '' },
-                { label: '笔记', status: '' },
-            ], progress);
-            showToast('&#128449; 第 ' + (i + 1) + ' / ' + config.loopCount + ': ' + currentVideoName, 'info', 2000);
-            await clickThreeButtons();
-            if (!isVideoProcessed(currentUrl)) markVideoProcessed(currentUrl);
-            updateStatusCard([
-                { label: '文稿', status: 'done' },
-                { label: '课件', status: 'done' },
-                { label: 'AI看', status: 'done' },
-                { label: '笔记', status: 'done' },
-            ], 100);
-            showToast('&#9208; 第 ' + (i + 1) + ' 个完成，等待确认...', 'warn');
-            const result = await waitForKey(
-                '第 ' + (i + 1) + ' / ' + config.loopCount + ' 已完成\n' + currentVideoName + '\n\n按 Y 继续下一集 · 按 N 停止',
-                config.keyTimeoutSec * 1000
-            );
-            if (result === 'continue') {
-                const hasNext = await goToNextVideo();
-                if (!hasNext) {
-                    showToast('&#9940; 已达最后一集，脚本结束', 'error');
+            showToast('&#128640; 开始运行: ' + currentVideoName, 'info');
+            await expandPlaylist();
+            await sleep(1000);
+            showStatusCard();
+
+            for (let i = 0; i < config.loopCount; i++) {
+                currentVideoIndex = i;
+                currentVideoName = getCurrentVideoName();
+                currentUrl = getVideoKey();
+                const progress = (i / config.loopCount) * 100;
+                updateStatusCard([
+                    { label: '文稿', status: '' },
+                    { label: '课件', status: '' },
+                    { label: 'AI看', status: '' },
+                    { label: '笔记', status: '' },
+                ], progress);
+                showToast('&#128449; 第 ' + (i + 1) + ' / ' + config.loopCount + ': ' + currentVideoName, 'info', 2000);
+                await clickThreeButtons();
+                if (!isVideoProcessed(currentUrl)) markVideoProcessed(currentUrl);
+                updateStatusCard([
+                    { label: '文稿', status: 'done' },
+                    { label: '课件', status: 'done' },
+                    { label: 'AI看', status: 'done' },
+                    { label: '笔记', status: 'done' },
+                ], 100);
+                showToast('&#9208; 第 ' + (i + 1) + ' 个完成，等待确认...', 'warn');
+                const result = await waitForKey(
+                    '第 ' + (i + 1) + ' / ' + config.loopCount + ' 已完成\n' + currentVideoName + '\n\n按 Y 继续下一集 · 按 N 停止',
+                    config.keyTimeoutSec * 1000
+                );
+                if (result === 'continue') {
+                    const hasNext = await goToNextVideo();
+                    if (!hasNext) {
+                        showToast('&#9940; 已达最后一集，脚本结束', 'error');
+                        break;
+                    }
+                    await sleep(1500);
+                } else {
+                    const msg = result === 'timeout' ? '&#9203; 按键超时，脚本结束' : '&#9940; 用户停止，脚本结束';
+                    showToast(msg, 'warn');
                     break;
                 }
-                await sleep(1500);
-            } else {
-                const msg = result === 'timeout' ? '&#9203; 按键超时，脚本结束' : '&#9940; 用户停止，脚本结束';
-                showToast(msg, result === 'timeout' ? 'warn' : 'warn');
-                break;
             }
-        }
 
-        document.removeEventListener('keydown', onKeydown);
-        hideStatusCard();
-        isRunning = false;
-        showToast('&#127881; 全部处理完成！', 'success', 3000);
+            showToast('&#127881; 全部处理完成！', 'success', 3000);
+        } catch (err) {
+            showToast('&#128165; 运行异常: ' + (err && err.message || err), 'error', 5000);
+            console.error('[BaiduPan-AutoProcess] run() error:', err);
+        } finally {
+            document.removeEventListener('keydown', onKeydown);
+            hideStatusCard();
+            isRunning = false;
+        }
     }
 
     // ============================================================
