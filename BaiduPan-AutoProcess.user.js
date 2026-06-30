@@ -554,13 +554,18 @@
     }
 
     function getCurrentVideoName() {
-        const all = document.querySelectorAll('*');
-        for (const el of all) {
+        const sidebar = document.querySelector('.drager_right');
+        const scope = sidebar || document;
+
+        // 1) 优先：侧栏内第一个匹配 .mp4 标题的元素
+        const candidates = scope.querySelectorAll('*');
+        for (const el of candidates) {
             const text = el.textContent.trim();
-            if ((text.match(/^\d+\s*-\s*第\d+课/) || text.match(/\.mp4$/)) && el.children.length === 0 && text.length < 100) {
+            if (text.match(/\.mp4$/) && el.children.length === 0 && text.length < 100) {
                 return text;
             }
         }
+        // 2) 兜底：从 URL path 解析
         try {
             const params = new URLSearchParams(window.location.search);
             const path = decodeURIComponent(params.get('path') || '');
