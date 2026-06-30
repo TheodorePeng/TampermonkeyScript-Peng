@@ -2,6 +2,10 @@
 
 个人常用的 Tampermonkey / Greasemonkey 用户脚本合集，用于提升日常网页浏览、学习笔记和内容获取的效率。
 
+> 🌐 **在线文档站**：[TampermonkeyScript-Peng 脚本合集说明（部署在 Cloudflare Pages）](https://tampermonkeyscript-peng.pages.dev/) — 可视化浏览全部脚本的功能说明、安装入口与演示页面，点击即可在浏览器中打开。
+>
+> 文档站源码位于本仓库 [`docs/`](docs/) 目录（由 `index.html` + `layout.js` + `scripts-data.js` + `style.css` 构建），通过 Cloudflare Pages 自动部署。
+
 ---
 
 ## 目录
