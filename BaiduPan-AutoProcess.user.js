@@ -31,6 +31,12 @@
             'AI看': 1,
             '笔记': 1,
         },
+        enabled: {
+            '文稿': true,
+            '课件': true,
+            'AI看': true,
+            '笔记': true,
+        },
     };
 
     const LS_KEY = "bap_settings";
@@ -262,7 +268,8 @@
                 config = {
                     ...DEFAULT_CONFIG,
                     ...saved,
-                    delays: { ...DEFAULT_CONFIG.delays, ...(saved.delays || {}) }
+                    delays: { ...DEFAULT_CONFIG.delays, ...(saved.delays || {}) },
+                    enabled: { ...DEFAULT_CONFIG.enabled, ...(saved.enabled || {}) },
                 };
             }
         } catch (e) { config = { ...DEFAULT_CONFIG }; }
