@@ -159,7 +159,7 @@ window.SCRIPTS_CATALOG = [
         name: 'ShortLink Direct Opener',
         file: 'scripts/shortlink-direct-opener.html',
         desc: '直接打开 ShortLink Studio 包装的外部协议链接（obsidian、notion、marginnote、slack、zoom、figma、zotero 等），并自动关闭中转页。',
-        version: '0.1.2',
+        version: '0.1.3',
         sites: '*.notion.site / shortlink.studio',
       },
     ],
