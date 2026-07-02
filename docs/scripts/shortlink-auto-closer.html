@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ShortLink Auto Closer — 使用说明</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" aria-label="打开目录">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+      </button>
+      <div class="site-title"><a href="../index.html">TampermonkeyScript-Peng</a></div>
+    </div>
+    <nav class="site-nav">
+      <a href="../index.html">← 返回首页</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+<aside class="doc-sidebar-left"></aside>
+
+<main class="doc-content">
+
+<div class="breadcrumb">
+  <a href="../index.html">首页</a>
+  <span class="breadcrumb-sep">/</span>
+  <a href="../index.html#tools">链接与工具</a>
+  <span class="breadcrumb-sep">/</span>
+  ShortLink Auto Closer
+</div>
+
+<h1>ShortLink Auto Closer</h1>
+
+<p>在 ShortLink Studio `/1/` 中转页等待外部协议链接自动触发后，自动关闭当前标签页。</p>
+
+<h2 id="info">基本信息</h2>
+
+<table class="info-table">
+  <tr><th>脚本名称</th><td>ShortLink Auto Closer</td></tr>
+  <tr><th>版本</th><td><code>0.1.1</code></td></tr>
+  <tr><th>作者</th><td>TheodorePeng</td></tr>
+  <tr><th>适用站点</th><td><code>shortlink.studio/1/*</code></td></tr>
+  <tr><th>文件大小</th><td>约 63 行</td></tr>
+  <tr><th>更新地址</th><td><a href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/ShortLinkAutoCloser.user.js" target="_blank">Raw 链接</a></td></tr>
+</table>
+
+<h2 id="install">安装</h2>
+
+<p>
+  <a class="install-btn" href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/ShortLinkAutoCloser.user.js" target="_blank">安装脚本</a>
+  <a class="source-btn" href="https://github.com/TheodorePeng/TampermonkeyScript-Peng/blob/main/ShortLinkAutoCloser.user.js" target="_blank">查看源码</a>
+</p>
+
+<h2 id="features">功能介绍</h2>
+
+<ul>
+  <li><strong>自动关中转页</strong>：在 shortlink.studio 的 <code>/1/...</code> 中转页加载时即（<code>document-start</code>）注入关闭逻辑</li>
+  <li><strong>多次重试机制</strong>：默认在 1.2s / 2.5s / 4s 三个时间点尝试调用 <code>window.close()</code>，确保外部协议链接触发后再关闭</li>
+  <li><strong>路径匹配</strong>：仅当 URL 是 <code>/1/&lt;非空后缀&gt;</code> 时才生效，避免误关其它页面</li>
+  <li><strong>无 UI 静默运行</strong>：不渲染任何按钮或面板，零视觉干扰</li>
+</ul>
+
+<h2 id="usage">使用方法</h2>
+
+<ol>
+  <li>安装脚本后无需额外设置，配合 <a href="shortlink-direct-opener.html">ShortLink Direct Opener</a> 使用效果最佳</li>
+  <li>点击任意 ShortLink Studio 包装的外部协议链接时，ShortLink Direct Opener 会主动调用系统协议唤起应用</li>
+  <li>本脚本在原中转页加载后会在 1.2s / 2.5s / 4s 三个时间点自动调用 <code>window.close()</code>，尝试关闭当前标签页</li>
+  <li>由于浏览器安全策略，部分外链唤起需要用户手势，本脚本会自动尽力关闭中转页</li>
+</ol>
+
+<div class="tip">
+  本脚本只对 <code>shortlink.studio/1/*</code> 这类"自动跳转"中转页生效，普通的内容页不会被关闭。
+</div>
+
+<div class="warning">
+  只支持 Chromium 系列（Chrome / Edge / Brave 等），因为 <code>window.close()</code> 需要脚本是被"用户主动打开"的页面调用。Firefox 上仅在 Tampermonkey 标签页中能生效，普通网页不行。
+</div>
+
+</main>
+
+<aside class="doc-sidebar-right"></aside>
+
+</div>
+
+<button class="back-to-top" aria-label="返回顶部">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l-4.5 4.5 1.06 1.06L8 6.12l3.44 3.44 1.06-1.06z"/></svg>
+</button>
+
+<script src="../scripts-data.js"></script>
+<script src="../layout.js"></script>
+
+</body>
+</html>

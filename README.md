@@ -19,6 +19,7 @@
   - [英语学习与笔记导出](#英语学习与笔记导出)
   - [学术资源](#学术资源)
   - [链接与工具](#链接与工具)
+  - [AI 助手](#ai-助手)
 - [安装方法](#安装方法)
 - [更新](#更新)
 - [免责声明](#免责声明)
@@ -87,8 +88,13 @@
 | 脚本 | 功能简介 | 适用站点 |
 |------|---------|---------|
 | **[ShortLinkDirectOpener.user.js](ShortLinkDirectOpener.user.js)** | 直接打开 ShortLink Studio 包装的外部协议链接（obsidian、notion、marginnote、slack、zoom、figma、zotero 等），并自动关闭中转页 | `*.notion.site` / `shortlink.studio` |
+| **[ShortLinkAutoCloser.user.js](ShortLinkAutoCloser.user.js)** | 在 `shortlink.studio/1/` 中转页自动尝试关闭标签页，与 ShortLinkDirectOpener 配合使用最稳（仅 Chromium） | `shortlink.studio/1/*` |
 
-> **注意**：`DoubaoTimelineMarkdownExporter.js` 目前为空文件，待后续开发完成。
+### AI 助手
+
+| 脚本 | 功能简介 | 适用站点 |
+|------|---------|---------|
+| **[DoubaoTimelineMarkdownExporter.js](DoubaoTimelineMarkdownExporter.js)** | 在豆包 Bilibili 视频解读页右下角添加悬浮按钮，一键把豆包生成的高亮时间线提取为 Markdown bullets | `doubao.com/summary/bilibili/*` |
 
 ---
 

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doubao Timeline Markdown Exporter — 使用说明</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" aria-label="打开目录">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+      </button>
+      <div class="site-title"><a href="../index.html">TampermonkeyScript-Peng</a></div>
+    </div>
+    <nav class="site-nav">
+      <a href="../index.html">← 返回首页</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+<aside class="doc-sidebar-left"></aside>
+
+<main class="doc-content">
+
+<div class="breadcrumb">
+  <a href="../index.html">首页</a>
+  <span class="breadcrumb-sep">/</span>
+  <a href="../index.html#ai">AI 助手</a>
+  <span class="breadcrumb-sep">/</span>
+  Doubao Timeline Markdown Exporter
+</div>
+
+<h1>Doubao Timeline Markdown Exporter</h1>
+
+<p>在豆包（Bilibili 视频解读页）右下角提供悬浮复制按钮，把豆包生成的高亮时间线节点一键复制为 Markdown bullets，便于做笔记或导出到 Obsidian。</p>
+
+<h2 id="info">基本信息</h2>
+
+<table class="info-table">
+  <tr><th>脚本名称</th><td>Doubao Timeline Markdown Exporter</td></tr>
+  <tr><th>版本</th><td><code>0.1.6</code></td></tr>
+  <tr><th>作者</th><td>TheodorePeng</td></tr>
+  <tr><th>适用站点</th><td><code>doubao.com/summary/bilibili/*</code></td></tr>
+  <tr><th>文件大小</th><td>约 508 行</td></tr>
+  <tr><th>更新地址</th><td><a href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/DoubaoTimelineMarkdownExporter.js" target="_blank">Raw 链接</a></td></tr>
+</table>
+
+<h2 id="install">安装</h2>
+
+<p>
+  <a class="install-btn" href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/DoubaoTimelineMarkdownExporter.js" target="_blank">安装脚本</a>
+  <a class="source-btn" href="https://github.com/TheodorePeng/TampermonkeyScript-Peng/blob/main/DoubaoTimelineMarkdownExporter.js" target="_blank">查看源码</a>
+</p>
+
+<h2 id="features">功能介绍</h2>
+
+<ul>
+  <li><strong>悬浮圆形按钮</strong>：在豆包 Bilibili 解读页右下角添加黑色毛玻璃圆形按钮，hover 显示「复制 Markdown」提示</li>
+  <li><strong>一键复制 Markdown bullets</strong>：自动提取豆包生成的时间线高亮（<code>youtube-share-page-highlight-item-*</code>），按"时间 + 标题"格式化为 Markdown 列表</li>
+  <li><strong>DOM 优先 + 文本回退</strong>：先从 <code>[data-testid^="youtube-share-page-highlight-item-"]</code> DOM 结构提取；DOM 缺失时回退到正文文本扫描带时间戳的行（<code>MM:SS</code> 或 <code>HH:MM:SS</code>）</li>
+  <li><strong>结构化产出</strong>：每个 group 一个一级 bullet，子节点缩进为二级 bullet，groups 之间用空行分隔</li>
+  <li><strong>状态机反馈</strong>：按钮有 idle / loading / success 三种状态，配合 toast 提示，支持 Promise / async/await 全异步</li>
+  <li><strong>MutationObserver 自动重挂</strong>：监听 DOM 与 popstate 事件，豆包 SPA 路由切换后按钮自动重新挂载</li>
+  <li><strong>去重 + 净化</strong>：相同"时间 + 标题"自动去重，文本中的多余空白被合并（normalize）</li>
+</ul>
+
+<h2 id="usage">使用方法</h2>
+
+<ol>
+  <li>安装脚本后，打开任意豆包 Bilibili 视频解读页（<code>https://www.doubao.com/summary/bilibili/&lt;id&gt;</code>）</li>
+  <li>页面右下角出现一颗黑色圆形按钮（带悬浮提示"复制 Markdown"）</li>
+  <li>点击按钮或通过 Tampermonkey 菜单的「Copy Doubao Timeline Markdown」触发</li>
+  <li>脚本会自动等待时间线 DOM 出现（最多 15s），提取后复制 Markdown 到剪贴板</li>
+  <li>按钮变为绿色（success 状态）约 1.6s，伴随右上角 toast 提示"已复制为 Markdown"</li>
+  <li>将内容粘贴到 Obsidian / Typora / Notion 等编辑器即可</li>
+</ol>
+
+<h2 id="output">输出示例</h2>
+
+<pre><code>- 01:23 开场介绍
+  - 01:30 嘉宾背景
+  - 02:05 议题陈述
+
+- 05:40 第一个核心观点
+  - 06:00 数据支撑
+  - 07:15 实例分析
+</code></pre>
+
+<div class="tip">
+  移动端 &lt; 768px 时按钮会自动缩小到 36×36 px 并隐藏 tooltip，避免遮挡小屏内容。
+</div>
+
+<div class="warning">
+  豆包前端改版可能导致 DOM 选择器失效。如果按钮存在但点击后提示"未发现时间线节点"，请反馈到仓库 Issue，作者会跟进修复选择器。
+</div>
+
+</main>
+
+<aside class="doc-sidebar-right"></aside>
+
+</div>
+
+<button class="back-to-top" aria-label="返回顶部">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l-4.5 4.5 1.06 1.06L8 6.12l3.44 3.44 1.06-1.06z"/></svg>
+</button>
+
+<script src="../scripts-data.js"></script>
+<script src="../layout.js"></script>
+
+</body>
+</html>

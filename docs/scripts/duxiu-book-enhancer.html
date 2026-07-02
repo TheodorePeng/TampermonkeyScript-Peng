@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Duxiu Book Enhancer — 使用说明</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" aria-label="打开目录">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+      </button>
+      <div class="site-title"><a href="../index.html">TampermonkeyScript-Peng</a></div>
+    </div>
+    <nav class="site-nav">
+      <a href="../index.html">← 返回首页</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+<aside class="doc-sidebar-left"></aside>
+
+<main class="doc-content">
+
+<div class="breadcrumb">
+  <a href="../index.html">首页</a>
+  <span class="breadcrumb-sep">/</span>
+  <a href="../index.html#academic">学术资源</a>
+  <span class="breadcrumb-sep">/</span>
+  Duxiu Book Enhancer（红太狼的平底锅）
+</div>
+
+<h1>Duxiu Book Enhancer（红太狼的平底锅）</h1>
+
+<p>读秀 / 超星图书增强：在搜索结果页与详情页直接显示图书 SSID / DX 号，并提供"部分阅读"、"试读"、"存货查询"、"返回 BookDetail"等快捷按钮。</p>
+
+<h2 id="info">基本信息</h2>
+
+<table class="info-table">
+  <tr><th>脚本名称</th><td>红太狼的平底锅</td></tr>
+  <tr><th>版本</th><td><code>1.0.4</code></td></tr>
+  <tr><th>作者</th><td>maer</td></tr>
+  <tr><th>适用站点</th><td><code>book.duxiu.com</code> · <code>www.duxiu.com</code> · <code>www.szlib.org.cn</code> · 图书馆参考联盟</td></tr>
+  <tr><th>文件大小</th><td>约 738 行</td></tr>
+  <tr><th>更新地址</th><td><a href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/DuxiuBookEnhancer.user.js" target="_blank">Raw 链接</a></td></tr>
+</table>
+
+<h2 id="install">安装</h2>
+
+<p>
+  <a class="install-btn" href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/DuxiuBookEnhancer.user.js" target="_blank">安装脚本</a>
+  <a class="source-btn" href="https://github.com/TheodorePeng/TampermonkeyScript-Peng/blob/main/DuxiuBookEnhancer.user.js" target="_blank">查看源码</a>
+</p>
+
+<h2 id="features">功能介绍</h2>
+
+<ul>
+  <li><strong>SSID / DX 直显</strong>：在读秀搜索结果页与详情页直接显示图书唯一编码 SS 号（无 SSID 则显示 DX 号）</li>
+  <li><strong>存货查询</strong>：详情页增加"存货查询"按钮，跳转到国家图书馆藏量查询接口</li>
+  <li><strong>部分阅读 / 试读</strong>：详情页增加"部分阅读"入口（试读页再增加"试读"按钮一键打开）</li>
+  <li><strong>一键下载四联图</strong>：在试读页 / 包库在线阅读页增加"一键下载"按钮，把封面 / 书名 / 版权 / 封底四张 PDG 图一键触发下载</li>
+  <li><strong>返回按钮</strong>：试读页加"返回 BookDetail"按钮，不用浏览器后退一键回到详情页</li>
+  <li><strong>显示 SSID（高级搜索 / 包库）</strong>：读秀"高级搜索"页与"包库搜索"页增加"显示 SS / 显示 SSID"按钮，一键注入所有结果的 SSID</li>
+  <li><strong>类型切换</strong>：藏馆页可一键切换"纸质藏馆"与"存货查询"</li>
+</ul>
+
+<h2 id="usage">使用方法</h2>
+
+<ol>
+  <li>安装脚本后，访问读秀 / 深圳文献港 / 全国图书馆参考联盟的搜索页或详情页</li>
+  <li>搜索结果页：每本书的封面图片附近自动注入 SSID / DX 号文本</li>
+  <li>详情页：SSID 显示在封面图片下方，下方按钮区出现「部分阅读」「存货查询」两个新按钮</li>
+  <li>试读页：左侧 PDG 列表底部出现「一键下载」链接，可一键触发下载</li>
+  <li>「包库在线阅读」页同样支持一键下载四张 PDG 图</li>
+</ol>
+
+<div class="tip">
+  如果 SS 号 8 位则直接显示，超过 8 位则改用 DX 号。这是读秀官方历史遗留编码规则。
+</div>
+
+<div class="warning">
+  本脚本原始作者为 maer，非本仓库 owner，仅作为收藏品收录在此。如失效请反馈到仓库 Issue，作者会跟进修复。
+</div>
+
+</main>
+
+<aside class="doc-sidebar-right"></aside>
+
+</div>
+
+<button class="back-to-top" aria-label="返回顶部">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l-4.5 4.5 1.06 1.06L8 6.12l3.44 3.44 1.06-1.06z"/></svg>
+</button>
+
+<script src="../scripts-data.js"></script>
+<script src="../layout.js"></script>
+
+</body>
+</html>

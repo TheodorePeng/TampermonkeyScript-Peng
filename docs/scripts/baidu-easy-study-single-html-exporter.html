@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Baidu Easy Study Single HTML Exporter — 使用说明</title>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-header-inner">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button class="hamburger" aria-label="打开目录">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+      </button>
+      <div class="site-title"><a href="../index.html">TampermonkeyScript-Peng</a></div>
+    </div>
+    <nav class="site-nav">
+      <a href="../index.html">← 返回首页</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc-layout">
+
+<aside class="doc-sidebar-left"></aside>
+
+<main class="doc-content">
+
+<div class="breadcrumb">
+  <a href="../index.html">首页</a>
+  <span class="breadcrumb-sep">/</span>
+  <a href="../index.html#baidupan">百度网盘增强</a>
+  <span class="breadcrumb-sep">/</span>
+  Baidu Easy Study Single HTML Exporter
+</div>
+
+<h1>Baidu Easy Study Single HTML Exporter</h1>
+
+<p>将百度网盘「简单学习」页面导出为单个离线 HTML 文件：自动内联 CSS / JS / 字体 / 图片资源，附带本地顶栏与离线交互脚本，可直接在本地打开使用。</p>
+
+<h2 id="info">基本信息</h2>
+
+<table class="info-table">
+  <tr><th>脚本名称</th><td>Baidu Easy Study Single HTML Exporter</td></tr>
+  <tr><th>版本</th><td><code>0.1.0</code></td></tr>
+  <tr><th>作者</th><td>TheodorePeng</td></tr>
+  <tr><th>适用站点</th><td><code>pan.baidu.com/embed/easy-study/detail*</code> · <code>wenku-strategy-ppt-sdpic.bj.bcebos.com/simplelearn/*</code></td></tr>
+  <tr><th>文件大小</th><td>约 946 行</td></tr>
+  <tr><th>更新地址</th><td><a href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/BaiduEasyStudySingleHtmlExporter.user.js" target="_blank">Raw 链接</a></td></tr>
+</table>
+
+<h2 id="install">安装</h2>
+
+<p>
+  <a class="install-btn" href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/BaiduEasyStudySingleHtmlExporter.user.js" target="_blank">安装脚本</a>
+  <a class="source-btn" href="https://github.com/TheodorePeng/TampermonkeyScript-Peng/blob/main/BaiduEasyStudySingleHtmlExporter.user.js" target="_blank">查看源码</a>
+</p>
+
+<h2 id="features">功能介绍</h2>
+
+<ul>
+  <li><strong>单文件离线导出</strong>：把当前简单学习页（含 iframe 子页）的 DOM、样式、字体、图片全部内联到一个 <code>.html</code> 文件</li>
+  <li><strong>本地顶栏</strong>：导出后的 HTML 顶部自带"导航 / 分享 / 导出 / 反馈"四个本地按钮，可继续操作</li>
+  <li><strong>iframe 通信</strong>：外层页与内层简化学习 iframe 通过 <code>postMessage</code> 协议通信，兼容跨域场景</li>
+  <li><strong>运行时净化</strong>：剥离 chrome-extension / tailwindcss 运行时 / MathJax-script 等内联脚本，避免离线打开报错</li>
+  <li><strong>资源 inline</strong>：把 <code>url(...)</code> 形式的远程资源（字体、图片）转成 <code>data:</code> URI，确保离线可用</li>
+  <li><strong>悬浮按钮</strong>：右下角浮动 ⇩ 按钮，hover 提示"导出单 HTML"，点击立即触发导出</li>
+  <li><strong>注册菜单命令</strong>：Tampermonkey 菜单命令"导出单 HTML"也可以触发同样的逻辑</li>
+</ul>
+
+<h2 id="usage">使用方法</h2>
+
+<ol>
+  <li>安装脚本后，打开百度网盘"简单学习"详情页（外层或带 iframe 的 inner 页均可）</li>
+  <li>页面右下角会出现一颗悬浮 ⇩ 按钮</li>
+  <li>点击按钮或通过 Tampermonkey 菜单运行"导出单 HTML"</li>
+  <li>浏览器自动下载一个 <code>&lt;标题&gt;.html</code> 文件，文件名经过非法字符清洗</li>
+  <li>下载完毕后离线打开，可以看到顶部带本地顶栏、所有样式 / 字体 / 图片都已内嵌</li>
+</ol>
+
+<h2 id="tech">技术特性</h2>
+
+<table class="info-table">
+  <tr><th>特性</th><th>说明</th></tr>
+  <tr><td>iframe 通信</td><td>通过 <code>postMessage</code> 在外层与内层 iframe 之间传递快照请求 / 响应</td></tr>
+  <tr><td>资源下载</td><td>使用 <code>GM_xmlhttpRequest</code> 跨域抓取 CSS / JS / 图片，二进制资源转 <code>data:</code> URI</td></tr>
+  <tr><td>CSS 内联</td><td>同步解析并替换所有 <code>url(...)</code> 为 data URI，确保离线字体可用</td></tr>
+  <tr><td>DOM 净化</td><td>移除 tailwindcss runtime / MathJax-script / extension scripts 等在线依赖</td></tr>
+  <tr><td>本地顶栏</td><td>注入 navigation / share / export / feedback 四个按钮的本地壳 JS</td></tr>
+</table>
+
+<div class="tip">
+  移动端会自动把按钮尺寸缩小、内边距调小，placeholder 文案在 &lt; 840px 时被隐藏。
+</div>
+
+</main>
+
+<aside class="doc-sidebar-right"></aside>
+
+</div>
+
+<button class="back-to-top" aria-label="返回顶部">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 4l-4.5 4.5 1.06 1.06L8 6.12l3.44 3.44 1.06-1.06z"/></svg>
+</button>
+
+<script src="../scripts-data.js"></script>
+<script src="../layout.js"></script>
+
+</body>
+</html>

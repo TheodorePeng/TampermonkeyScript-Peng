@@ -88,6 +88,14 @@ window.SCRIPTS_CATALOG = [
         version: '1.36',
         sites: 'YouTube / Bilibili',
       },
+      {
+        id: 'baidu-easy-study-single-html-exporter',
+        name: 'Baidu Easy Study Single HTML Exporter',
+        file: 'scripts/baidu-easy-study-single-html-exporter.html',
+        desc: '将百度网盘「简单学习」页面导出为单个离线 HTML 文件，自动内联 CSS、JS、字体与图片资源。',
+        version: '0.1.0',
+        sites: 'pan.baidu.com/embed/easy-study/detail*',
+      },
     ],
   },
   {
@@ -109,6 +117,20 @@ window.SCRIPTS_CATALOG = [
         desc: '根据 YouTube 视频描述中的时间戳章节，下载每个章节的首帧截图，支持带项目符号的时间戳格式。',
         version: '0.1.3',
         sites: 'youtube.com/watch*',
+      },
+    ],
+  },
+  {
+    id: 'bilibili',
+    title: 'Bilibili 增强',
+    pages: [
+      {
+        id: 'bilibili-chapter-copier',
+        name: 'Bilibili Chapter Copier',
+        file: 'scripts/bilibili-chapter-copier.html',
+        desc: '在 B 站视频章节面板添加「复制」按钮，一键复制所有章节的时间范围与名称到剪贴板。',
+        version: '0.1.1',
+        sites: 'bilibili.com/video/*',
       },
     ],
   },
@@ -151,6 +173,20 @@ window.SCRIPTS_CATALOG = [
     ],
   },
   {
+    id: 'academic',
+    title: '学术资源',
+    pages: [
+      {
+        id: 'duxiu-book-enhancer',
+        name: 'Duxiu Book Enhancer (红太狼的平底锅)',
+        file: 'scripts/duxiu-book-enhancer.html',
+        desc: '读秀图书增强：直接显示 SSID / DX 号，提供存货查询、部分阅读、试读跳转、一键下载四联图等快捷按钮（原作者：maer）。',
+        version: '1.0.4',
+        sites: 'book.duxiu.com',
+      },
+    ],
+  },
+  {
     id: 'tools',
     title: '链接与工具',
     pages: [
@@ -161,6 +197,28 @@ window.SCRIPTS_CATALOG = [
         desc: '直接打开 ShortLink Studio 包装的外部协议链接（obsidian、notion、marginnote、slack、zoom、figma、zotero 等），并自动关闭中转页。',
         version: '0.1.3',
         sites: '*.notion.site / shortlink.studio',
+      },
+      {
+        id: 'shortlink-auto-closer',
+        name: 'ShortLink Auto Closer',
+        file: 'scripts/shortlink-auto-closer.html',
+        desc: '在 ShortLink Studio 中转页加载时自动尝试关闭当前标签页，需配合 ShortLink Direct Opener 使用。',
+        version: '0.1.1',
+        sites: 'shortlink.studio/1/*',
+      },
+    ],
+  },
+  {
+    id: 'ai',
+    title: 'AI 助手',
+    pages: [
+      {
+        id: 'doubao-timeline-markdown-exporter',
+        name: 'Doubao Timeline Markdown Exporter',
+        file: 'scripts/doubao-timeline-markdown-exporter.html',
+        desc: '提取豆包（Bilibili 视频解读页）生成的高亮时间线节点，一键复制为 Markdown bullets 便于做笔记。',
+        version: '0.1.6',
+        sites: 'doubao.com/summary/bilibili/*',
       },
     ],
   },
