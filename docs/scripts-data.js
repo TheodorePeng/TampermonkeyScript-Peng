@@ -45,7 +45,7 @@ window.SCRIPTS_CATALOG = [
         name: 'BaiduPan AutoProcess',
         file: 'scripts/baidupan-auto-process.html',
         desc: '批量触发百度网盘视频的文稿/课件/AI看/笔记按钮，支持按键交互控制（Y/N 继续/停止）。',
-        version: '1.8',
+        version: '1.9.3',
         sites: 'pan.baidu.com/pfile/video',
       },
       {
