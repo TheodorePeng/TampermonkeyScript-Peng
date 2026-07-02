@@ -61,7 +61,7 @@ window.SCRIPTS_CATALOG = [
         name: 'BaiduPan FloatingWindows Pro',
         file: 'scripts/baidupan-floating-windows-pro.html',
         desc: 'Pro 版双悬浮窗，支持 shell 布局控制、状态持久化，包含视频播放窗和资料窗，支持标签切换。',
-        version: '1.0.9',
+        version: '1.0.11',
         sites: 'pan.baidu.com/pfile/video',
       },
       {
