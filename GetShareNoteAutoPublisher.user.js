@@ -7,6 +7,8 @@
 // @match        https://www.biji.com/mine/notes/*
 // @run-at       document-idle
 // @grant        none
+// @updateURL    https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/GetShareNoteAutoPublisher.user.js
+// @downloadURL  https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/GetShareNoteAutoPublisher.user.js
 // ==/UserScript==
 
 // v0.1.3: 新 Tab 自动点「导出 Notion」按钮（事件驱动跨 tab 访问）
