@@ -1,19 +1,51 @@
 // ==UserScript==
 // @name         GetShareNoteAutoPublisher
 // @namespace    https://github.com/peng
-// @version      0.1.0
-// @description  在得到大脑私有笔记页一键打预设标签 + 公开分享并打开新 Tab。仅 @match /mine/notes/*，不影响公开页旧脚本。
+// @version      0.1.1
+// @description  在得到大脑私有笔记页通过小图标一键打自定义标签 + 公开分享并打开新 Tab。v0.1.1：设置面板 + localStorage 持久化。
 // @author       peng
 // @match        https://www.biji.com/mine/notes/*
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
 
+// v0.1.1: 替换大按钮为小图标 + 引入设置面板 + localStorage 持久化
+
 (() => {
   'use strict';
 
-  // 硬编码测试标签（按需修改）
-  const TAGS = ['auto-share-2026', 'biji-mine'];
+  // ---------- 默认设置 & 持久化 ----------
+  const STORAGE_KEY = 'gsap_settings_v1';
+  const DEFAULT_SETTINGS = {
+    addTags: true,
+    sharePublic: true,
+    tags: 'auto-share-2026\nbiji-mine',
+  };
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return { ...DEFAULT_SETTINGS };
+      const parsed = JSON.parse(raw);
+      return { ...DEFAULT_SETTINGS, ...parsed };
+    } catch (_) {
+      return { ...DEFAULT_SETTINGS };
+    }
+  }
+
+  function saveSettings(settings) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    } catch (_) {
+      /* 隐私模式可能写失败，忽略 */
+    }
+  }
+
+  function parseTags(str) {
+    return [...new Set(
+      (str || '').split(/[\n,]+/).map((s) => s.trim()).filter(Boolean),
+    )];
+  }
 
   // ---------- 工具函数 ----------
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -28,7 +60,7 @@
     throw new Error('waitFor: timeout');
   }
 
-  // 触发"添加标签" popover（如果还没开）
+  // ---------- 流程 1：添加标签 ----------
   async function openTagPopoverIfNeeded() {
     const existing = document.querySelector('.n-popover.tag-popover');
     if (existing && existing.offsetWidth > 0) return existing;
@@ -41,14 +73,12 @@
     );
   }
 
-  // 读取当前笔记已添加的标签文本
   function getCurrentTags() {
     return [...document.querySelectorAll('.n-tag.note-tag-item')]
       .map((el) => el.textContent.trim())
       .filter(Boolean);
   }
 
-  // 添加单个 tag（若已存在则跳过）
   async function addOneTag(tag) {
     const current = getCurrentTags();
     if (current.includes(tag)) return { tag, status: 'exists' };
@@ -60,12 +90,10 @@
     );
     input.focus();
 
-    // 用 native setter 写值（兼容 React/Vue 受控组件）
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
     setter.call(input, tag);
     input.dispatchEvent(new Event('input', { bubbles: true }));
 
-    // Enter → 弹出"创建标签..."选项
     ['keydown', 'keypress', 'keyup'].forEach((type) => {
       input.dispatchEvent(
         new KeyboardEvent(type, {
@@ -79,9 +107,6 @@
       );
     });
 
-    // 等候两条路径之一：
-    //  (a) .add-tag — 用户 tag 库里没有，需要创建
-    //  (b) .tag-item (text === tag) — 用户 tag 库里已有，直接复用
     const pick = await waitFor(() => {
       const popover = document.querySelector('.n-popover.tag-popover');
       if (!popover) return null;
@@ -95,17 +120,16 @@
     }, { timeoutMs: 3000 });
     pick.el.click();
 
-    // 等 tag chip 出现在笔记上
     await waitFor(
       () => getCurrentTags().includes(tag),
       { timeoutMs: 3000 },
     );
-    return { tag, status: 'added' };
+    return { tag, status: 'added', path: pick.kind };
   }
 
-  async function addTags() {
+  async function addTags(tags) {
     const log = [];
-    for (const tag of TAGS) {
+    for (const tag of tags) {
       log.push(await addOneTag(tag));
     }
     return log;
@@ -113,7 +137,6 @@
 
   // ---------- 流程 2：公开分享 ----------
   async function sharePublic() {
-    // 1. 找工具栏的分享按钮
     const shareBtn = [...document.querySelectorAll('button')].find((b) => {
       const label = b.querySelector('.btn-label');
       return label && label.textContent.trim() === '分享';
@@ -121,20 +144,17 @@
     if (!shareBtn) throw new Error('工具栏分享按钮未找到');
     shareBtn.click();
 
-    // 2. 等 share popover 出现
     await waitFor(
       () => document.querySelector('.n-popover.share-popover'),
       { timeoutMs: 3000 },
     );
 
-    // 3. 点"公开"选项
     const publicOpt = [...document.querySelectorAll('.n-popover.share-popover .share-options-item')].find(
       (el) => el.querySelector('.item-text')?.textContent?.trim() === '公开',
     );
     if (!publicOpt) throw new Error('公开选项未找到');
     publicOpt.click();
 
-    // 4. 等 URL 生成（input.value 变成 https://www.biji.com/note/share_note/...）
     const url = await waitFor(() => {
       const v = document.querySelector('.n-popover.share-popover input.n-input__input-el')?.value;
       return v && /^https:\/\/www\.biji\.com\/note\/share_note\//.test(v) ? v : null;
@@ -143,47 +163,188 @@
     return url;
   }
 
-  // ---------- 主入口 ----------
-  function injectButton() {
-    if (document.getElementById('gsap-trigger-btn')) return;
-    const btn = document.createElement('div');
-    btn.id = 'gsap-trigger-btn';
-    btn.textContent = '🏷️➤ 一键公开';
-    btn.style.cssText = [
-      'position: fixed',
-      'right: 20px',
-      'bottom: 20px',
-      'z-index: 2147483647',
-      'padding: 10px 14px',
-      'background: #1677ff',
-      'color: #fff',
-      'font-size: 14px',
-      'border-radius: 6px',
-      'cursor: pointer',
-      'box-shadow: 0 4px 12px rgba(0,0,0,.2)',
-      'user-select: none',
-      'font-family: -apple-system, BlinkMacSystemFont, sans-serif',
-    ].join(';');
-    btn.addEventListener('click', async () => {
-      if (btn.dataset.busy === '1') return;
-      btn.dataset.busy = '1';
-      btn.textContent = '处理中…';
-      try {
-        const tagLog = await addTags();
-        console.log('[GetShareNoteAutoPublisher] tags:', tagLog);
-        const url = await sharePublic();
-        console.log('[GetShareNoteAutoPublisher] share url:', url);
-        if (url) window.open(url, '_blank');
-        btn.textContent = '✅ 完成';
-      } catch (e) {
-        console.error('[GetShareNoteAutoPublisher] failed:', e);
-        btn.textContent = '❌ 失败（看 console）';
-      } finally {
-        delete btn.dataset.busy;
+  // ---------- 主流程（按 settings 执行） ----------
+  let isRunning = false;
+
+  async function runFromSettings() {
+    if (isRunning) return;
+    isRunning = true;
+    try {
+      const settings = loadSettings();
+      const tags = parseTags(settings.tags);
+      const result = { addTags: null, sharePublic: null };
+
+      if (settings.addTags && tags.length > 0) {
+        result.addTags = await addTags(tags);
+      } else {
+        result.addTags = { skipped: true, reason: settings.addTags ? 'no tags' : 'disabled' };
       }
+
+      if (settings.sharePublic) {
+        const url = await sharePublic();
+        result.sharePublic = { url };
+        if (url) window.open(url, '_blank');
+      } else {
+        result.sharePublic = { skipped: true };
+      }
+
+      console.log('[GSAP] done:', result);
+      flashTrigger('success');
+      return result;
+    } catch (e) {
+      console.error('[GSAP] failed:', e);
+      flashTrigger('error');
+      throw e;
+    } finally {
+      isRunning = false;
+    }
+  }
+
+  // ---------- 浮动小图标按钮 ----------
+  function mountTrigger() {
+    if (document.getElementById('gsap-trigger-btn')) return;
+    const btn = document.createElement('button');
+    btn.id = 'gsap-trigger-btn';
+    btn.type = 'button';
+    btn.setAttribute('aria-label', 'GetShareNote AutoPublisher 设置');
+    btn.innerHTML = `
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/>
+        <polyline points="16 6 12 2 8 6"/>
+        <line x1="12" y1="2" x2="12" y2="15"/>
+      </svg>
+    `;
+    btn.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:2147483647;width:28px;height:28px;padding:0;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,0.6);color:#292D34;border:1px solid rgba(0,0,0,0.06);border-radius:50%;box-shadow:0 2px 6px rgba(0,0,0,0.08);cursor:pointer;opacity:0.35;transition:opacity .2s ease, transform .2s ease, box-shadow .2s ease;user-select:none;font:inherit';
+    btn.addEventListener('mouseenter', () => { btn.style.opacity = '0.95'; btn.style.transform = 'scale(1.1)'; });
+    btn.addEventListener('mouseleave', () => { btn.style.opacity = '0.35'; btn.style.transform = 'scale(1)'; });
+    btn.addEventListener('focus', () => { btn.style.opacity = '0.95'; });
+    btn.addEventListener('blur', () => { btn.style.opacity = '0.35'; });
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePopover();
     });
     document.body.appendChild(btn);
   }
 
-  injectButton();
+  function flashTrigger(kind) {
+    const btn = document.getElementById('gsap-trigger-btn');
+    if (!btn) return;
+    const orig = getComputedStyle(btn).borderColor;
+    btn.style.borderColor = kind === 'success' ? '#52c41a' : '#ff4d4f';
+    btn.style.opacity = '0.95';
+    setTimeout(() => {
+      btn.style.borderColor = orig;
+      btn.style.opacity = '0.35';
+    }, 1200);
+  }
+
+  // ---------- 设置面板 ----------
+  let popoverOpen = false;
+  let popoverEl = null;
+
+  function ensurePopover() {
+    if (popoverEl) return popoverEl;
+    popoverEl = document.createElement('div');
+    popoverEl.id = 'gsap-settings-popover';
+    popoverEl.setAttribute('role', 'dialog');
+    popoverEl.setAttribute('aria-label', 'GetShareNote AutoPublisher 设置');
+    popoverEl.style.cssText = 'position:fixed;z-index:2147483647;width:280px;padding:12px;background:#ffffff;border:1px solid rgba(0,0,0,0.08);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,0.15);font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;color:#292D34;display:none';
+    popoverEl.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <strong style="font-size:13px;">设置</strong>
+        <button type="button" data-action="close" aria-label="关闭" style="background:transparent;border:0;cursor:pointer;font-size:16px;line-height:1;padding:0 2px;color:#8A8F99;">×</button>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;margin:6px 0;cursor:pointer;">
+        <input type="checkbox" data-key="addTags"> 添加标签
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;margin:6px 0;cursor:pointer;">
+        <input type="checkbox" data-key="sharePublic"> 公开分享并打开新 Tab
+      </label>
+      <div style="margin:8px 0 4px;">标签（每行一个或逗号分隔）</div>
+      <textarea data-key="tags" rows="3" placeholder="auto-share-2026&#10;biji-mine" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #d9d9d9;border-radius:4px;resize:vertical;font:inherit;color:inherit;background:#fff;"></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
+        <button type="button" data-action="save" style="background:transparent;border:1px solid #d9d9d9;padding:6px 12px;border-radius:4px;cursor:pointer;font:inherit;color:inherit;">保存</button>
+        <button type="button" data-action="run" style="background:#1677ff;color:#fff;border:0;padding:6px 14px;border-radius:4px;cursor:pointer;font:inherit;">运行</button>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:#8A8F99;">v0.1.1 · 设置自动保存到 localStorage</div>
+    `;
+    popoverEl.addEventListener('click', (e) => e.stopPropagation());
+    popoverEl.addEventListener('input', (e) => {
+      const t = e.target;
+      if (!(t instanceof HTMLElement)) return;
+      const key = t.getAttribute('data-key');
+      if (!key) return;
+      const cur = loadSettings();
+      if (t.type === 'checkbox') cur[key] = t.checked;
+      else cur[key] = t.value;
+      saveSettings(cur);
+    });
+    popoverEl.addEventListener('click', (e) => {
+      const t = e.target;
+      if (!(t instanceof HTMLElement)) return;
+      const action = t.getAttribute('data-action');
+      if (action === 'close' || action === 'save') {
+        hidePopover();
+      } else if (action === 'run') {
+        hidePopover();
+        runFromSettings();
+      }
+    });
+    document.body.appendChild(popoverEl);
+    return popoverEl;
+  }
+
+  function positionPopover() {
+    if (!popoverEl) return;
+    const btn = document.getElementById('gsap-trigger-btn');
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    const popW = popoverEl.offsetWidth || 280;
+    const popH = popoverEl.offsetHeight || 240;
+    // 出现在图标左上方 8px 处
+    let left = r.right - popW;
+    let top = r.top - popH - 8;
+    // 兜底：超出视口则反向
+    if (top < 8) top = r.bottom + 8;
+    if (left < 8) left = 8;
+    if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
+    popoverEl.style.left = `${left}px`;
+    popoverEl.style.top = `${top}px`;
+  }
+
+  function showPopover() {
+    const p = ensurePopover();
+    const cur = loadSettings();
+    p.querySelector('[data-key="addTags"]').checked = !!cur.addTags;
+    p.querySelector('[data-key="sharePublic"]').checked = !!cur.sharePublic;
+    p.querySelector('[data-key="tags"]').value = cur.tags || '';
+    p.style.display = 'block';
+    popoverOpen = true;
+    positionPopover();
+  }
+
+  function hidePopover() {
+    if (popoverEl) popoverEl.style.display = 'none';
+    popoverOpen = false;
+  }
+
+  function togglePopover() {
+    popoverOpen ? hidePopover() : showPopover();
+  }
+
+  // 全局 click / Esc 关闭
+  document.addEventListener('click', (e) => {
+    if (!popoverOpen) return;
+    const t = e.target;
+    if (t instanceof Node && popoverEl && popoverEl.contains(t)) return;
+    if (t instanceof Node && document.getElementById('gsap-trigger-btn')?.contains(t)) return;
+    hidePopover();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (popoverOpen && e.key === 'Escape') hidePopover();
+  });
+  window.addEventListener('resize', () => { if (popoverOpen) positionPopover(); });
+
+  // ---------- 启动 ----------
+  mountTrigger();
 })();
