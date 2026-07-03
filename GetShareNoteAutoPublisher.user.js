@@ -1,15 +1,15 @@
 // ==UserScript==
 // @name         GetShareNoteAutoPublisher
 // @namespace    https://github.com/peng
-// @version      0.1.2
-// @description  在得到大脑私有笔记页单击小图标直接打标签 + 公开分享并打开新 Tab；右键图标进入设置。v0.1.2：弹窗自动关闭 + 标签记忆 + 一键直跑。
+// @version      0.1.3
+// @description  在得到大脑私有笔记页单击小图标直接打标签 + 公开分享并打开新 Tab；右键图标进入设置。v0.1.3：新 Tab 自动点「导出 Notion」（复用旧 notion-exporter 按钮）。
 // @author       peng
 // @match        https://www.biji.com/mine/notes/*
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
 
-// v0.1.2: 一键直跑 + 原页 popover 自动关闭 + 标签记忆 + 右键打开设置
+// v0.1.3: 新 Tab 自动点「导出 Notion」按钮（事件驱动跨 tab 访问）
 
 (() => {
   'use strict';
@@ -19,6 +19,7 @@
   const DEFAULT_SETTINGS = {
     addTags: true,
     sharePublic: true,
+    addAutoExport: true,
     tags: 'auto-share-2026\nbiji-mine',
   };
 
@@ -170,6 +171,28 @@
     return url;
   }
 
+  // ---------- 新 Tab 自动点「导出 Notion」按钮（复用 GetShareNoteNotionExporter 注入的 #get-share-note-exporter-button） ----------
+  async function autoClickExportButton(newTab) {
+    if (!newTab) return { ok: false, reason: 'no tab' };
+    // 阶段 1：等新 tab readyState=complete（不阻塞太久，5s 兜底）
+    await waitFor(() => {
+      try { return newTab.document && newTab.document.readyState === 'complete'; }
+      catch (_) { return false; }
+    }, { timeoutMs: 5000, intervalMs: 100 });
+    // 阶段 2：等 #get-share-note-exporter-button 出现（实测 < 100ms，慢网 5s 兜底）
+    const btn = await waitFor(() => {
+      try { return newTab.document.getElementById('get-share-note-exporter-button'); }
+      catch (_) { return null; }
+    }, { timeoutMs: 5000, intervalMs: 100 });
+    if (!btn) return { ok: false, reason: 'button not found' };
+    try {
+      btn.click();
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: String(e?.message || e) };
+    }
+  }
+
   // ---------- 主流程（按 settings 执行） ----------
   let isRunning = false;
 
@@ -190,7 +213,18 @@
       if (settings.sharePublic) {
         const url = await sharePublic();
         result.sharePublic = { url };
-        if (url) window.open(url, '_blank');
+        if (url) {
+          const newTab = window.open(url, '_blank');
+          // 新 Tab 自动点「导出 Notion」（异步、不阻塞主流程 ✅ 反馈）
+          if (newTab && settings.addAutoExport) {
+            autoClickExportButton(newTab)
+              .then((r) => {
+                if (!r.ok) console.warn('[GSAP] auto-click skipped:', r.reason);
+                else console.log('[GSAP] auto-clicked 导出 Notion');
+              })
+              .catch((e) => console.warn('[GSAP] auto-click failed:', e));
+          }
+        }
       } else {
         result.sharePublic = { skipped: true };
       }
@@ -202,6 +236,7 @@
         saveSettings({
           addTags: settings.addTags,
           sharePublic: settings.sharePublic,
+          addAutoExport: settings.addAutoExport,
           tags: tags.join('\n'),
         });
       }
@@ -282,6 +317,9 @@
       <label style="display:flex;align-items:center;gap:6px;margin:6px 0;cursor:pointer;">
         <input type="checkbox" data-key="sharePublic"> 公开分享并打开新 Tab
       </label>
+      <label style="display:flex;align-items:center;gap:6px;margin:6px 0;cursor:pointer;">
+        <input type="checkbox" data-key="addAutoExport"> 新 Tab 自动点「导出 Notion」
+      </label>
       <div style="margin:8px 0 4px;">标签（每行一个或逗号分隔）</div>
       <textarea data-key="tags" rows="3" placeholder="auto-share-2026&#10;biji-mine" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #d9d9d9;border-radius:4px;resize:vertical;font:inherit;color:inherit;background:#fff;"></textarea>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
@@ -339,6 +377,7 @@
     const cur = loadSettings();
     p.querySelector('[data-key="addTags"]').checked = !!cur.addTags;
     p.querySelector('[data-key="sharePublic"]').checked = !!cur.sharePublic;
+    p.querySelector('[data-key="addAutoExport"]').checked = !!cur.addAutoExport;
     p.querySelector('[data-key="tags"]').value = cur.tags || '';
     p.style.display = 'block';
     popoverOpen = true;
