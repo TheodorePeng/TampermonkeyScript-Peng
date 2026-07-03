@@ -1,15 +1,15 @@
 // ==UserScript==
 // @name         GetShareNoteAutoPublisher
 // @namespace    https://github.com/peng
-// @version      0.1.1
-// @description  在得到大脑私有笔记页通过小图标一键打自定义标签 + 公开分享并打开新 Tab。v0.1.1：设置面板 + localStorage 持久化。
+// @version      0.1.2
+// @description  在得到大脑私有笔记页单击小图标直接打标签 + 公开分享并打开新 Tab；右键图标进入设置。v0.1.2：弹窗自动关闭 + 标签记忆 + 一键直跑。
 // @author       peng
 // @match        https://www.biji.com/mine/notes/*
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
 
-// v0.1.1: 替换大按钮为小图标 + 引入设置面板 + localStorage 持久化
+// v0.1.2: 一键直跑 + 原页 popover 自动关闭 + 标签记忆 + 右键打开设置
 
 (() => {
   'use strict';
@@ -124,6 +124,9 @@
       () => getCurrentTags().includes(tag),
       { timeoutMs: 3000 },
     );
+    // 关闭 tag popover：再点一次 .n-tag.note-tag-add 触发 toggle 关闭
+    const trigger = document.querySelector('div.n-tag.note-tag-add');
+    if (trigger) trigger.click();
     return { tag, status: 'added', path: pick.kind };
   }
 
@@ -160,6 +163,10 @@
       return v && /^https:\/\/www\.biji\.com\/note\/share_note\//.test(v) ? v : null;
     }, { timeoutMs: 5000 });
 
+    // 关闭 share popover：直接隐藏（实测 Esc / body.click / 再点分享 都不关）
+    const sharePopover = document.querySelector('.n-popover.share-popover');
+    if (sharePopover) sharePopover.style.display = 'none';
+
     return url;
   }
 
@@ -189,6 +196,15 @@
       }
 
       console.log('[GSAP] done:', result);
+      // 标签记忆：若 addTags 实际跑了，把 effective settings（含 tag 列表）写回 localStorage
+      // 首次跑用 default 的 tag，跑完后 localStorage 就有这组 tag；下次直接复用
+      if (settings.addTags && tags.length > 0) {
+        saveSettings({
+          addTags: settings.addTags,
+          sharePublic: settings.sharePublic,
+          tags: tags.join('\n'),
+        });
+      }
       flashTrigger('success');
       return result;
     } catch (e) {
@@ -221,8 +237,14 @@
     btn.addEventListener('blur', () => { btn.style.opacity = '0.35'; });
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      togglePopover();
+      runFromSettings();
     });
+    btn.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      showPopover();
+    });
+    btn.setAttribute('title', '左键：运行  ·  右键：设置');
     document.body.appendChild(btn);
   }
 
