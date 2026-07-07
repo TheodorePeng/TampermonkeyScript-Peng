@@ -213,6 +213,14 @@ window.SCRIPTS_CATALOG = [
     title: 'AI 助手',
     pages: [
       {
+        id: 'chatgpt-auto-read-aloud',
+        name: 'ChatGPT Auto Read Aloud',
+        file: 'scripts/chatgpt-auto-read-aloud.html',
+        desc: '在 ChatGPT 页面添加可拖拽记忆位置的极简半透明 Icon 朗读按钮，静默触发 More actions / 更多操作 → Read aloud / 朗读。',
+        version: '0.1.4',
+        sites: 'chatgpt.com/*',
+      },
+      {
         id: 'doubao-timeline-markdown-exporter',
         name: 'Doubao Timeline Markdown Exporter',
         file: 'scripts/doubao-timeline-markdown-exporter.html',
