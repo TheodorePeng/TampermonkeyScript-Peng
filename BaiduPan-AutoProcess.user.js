@@ -504,6 +504,9 @@
                 resolve(r);
                 return;
             }
+            // Round 2+ 防御：如果焦点在 noteIframe 内，Y/N 键事件不会冒泡到父 doc 的 onKeydown。
+            // 这里强制把焦点移回父 doc，确保 waitForKey 期间按键被父 doc 监听到。
+            blurNoteEditorFocus();
             keyResolve = resolve;
             clearTimeout(keyTimer);
 
@@ -524,13 +527,19 @@
 
                 document.getElementById('bap-btn-continue').addEventListener('click', function() {
                     confirmOverlay.classList.remove('bap-visible');
-                    keyResolve = null;
-                    resolve('continue');
+                    if (keyResolve) {
+                        const r = keyResolve;
+                        keyResolve = null;
+                        r('continue');
+                    }
                 });
                 document.getElementById('bap-btn-stop').addEventListener('click', function() {
                     confirmOverlay.classList.remove('bap-visible');
-                    keyResolve = null;
-                    resolve('stop');
+                    if (keyResolve) {
+                        const r = keyResolve;
+                        keyResolve = null;
+                        r('stop');
+                    }
                 });
             } else {
                 document.getElementById('bap-confirm-msg').textContent = message || '';
