@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         RouterPark Free Key Exporter
 // @namespace    http://tampermonkey.net/
-// @version      1.3.1
-// @description  路由公园（RouterPark）免费 API Key 管理与导出面板，支持完整解密真实 Key、替换 Base URL、实时搜索筛选、自动展开分类、行末一键模拟复制详情及导出 CSV
+// @version      1.3.2
+// @description  路由公园（RouterPark）免费 API Key 管理与导出面板，支持完整解密真实 Key、替换 Base URL、实时搜索筛选、自动展开分类、行末一键模拟测试连通性、一键复制详情及导出 CSV
 // @author       TheodorePeng
 // @match        https://routerpark.com/*/free-claude-code*
 // @match        https://routerpark.com/free-claude-code*
@@ -478,9 +478,18 @@
                 color: #f87171;
             }
 
+            /* 行操作按钮容器 */
+            .rp-row-actions {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 6px;
+                flex-wrap: nowrap;
+            }
+
             /* 行操作按钮 */
             .rp-row-btn {
-                padding: 4px 10px;
+                padding: 4px 9px;
                 background: #f1f5f9;
                 color: #475569;
                 font-size: 11.5px;
@@ -493,12 +502,30 @@
                 display: inline-flex;
                 align-items: center;
                 gap: 4px;
+                user-select: none;
             }
 
             .rp-row-btn:hover {
                 background: #e2e8f0;
                 color: #0f172a;
                 border-color: #94a3b8;
+            }
+
+            .rp-row-btn:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
+
+            .rp-row-btn-test {
+                background: #eff6ff;
+                color: #0284c7;
+                border-color: #bae6fd;
+            }
+
+            .rp-row-btn-test:hover {
+                background: #e0f2fe;
+                color: #0369a1;
+                border-color: #7dd3fc;
             }
 
             .dark .rp-row-btn,
@@ -512,6 +539,28 @@
             html.dark .rp-row-btn:hover {
                 background: #475569;
                 color: #ffffff;
+            }
+
+            .dark .rp-row-btn-test,
+            html.dark .rp-row-btn-test {
+                background: rgba(2, 132, 199, 0.2);
+                color: #38bdf8;
+                border-color: rgba(56, 189, 248, 0.3);
+            }
+
+            .dark .rp-row-btn-test:hover,
+            html.dark .rp-row-btn-test:hover {
+                background: rgba(2, 132, 199, 0.35);
+                color: #7dd3fc;
+            }
+
+            /* 旋转动画 */
+            @keyframes rp-spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+            }
+            .rp-spin {
+                animation: rp-spin 1s linear infinite;
             }
 
             /* 弹窗底部操作栏 */
@@ -808,16 +857,27 @@
         overlay.querySelector(`#${APP_ID}-btn-copy-md`).onclick = copyAsMarkdown;
         overlay.querySelector(`#${APP_ID}-btn-copy-keys`).onclick = copyOnlyKeys;
 
-        // 使用事件委托处理行内“复制详情”点击，避免重复绑定几百个事件监听器
+        // 使用事件委托处理行内操作按钮点击（测试与复制详情）
         const tableBody = overlay.querySelector(`#${APP_ID}-table-body`);
         tableBody.addEventListener('click', async (e) => {
-            const rowBtn = e.target.closest('button[data-act="copy-row"]');
-            if (!rowBtn) return;
+            const testBtn = e.target.closest('button[data-act="test-row"]');
+            if (testBtn) {
+                const sig = testBtn.getAttribute('data-sig');
+                const item = state.extractedKeys.find((k) => k.sig === sig);
+                if (item) {
+                    await handleSingleRowTest(item, testBtn);
+                }
+                return;
+            }
 
-            const sig = rowBtn.getAttribute('data-sig');
-            const item = state.extractedKeys.find((k) => k.sig === sig);
-            if (item) {
-                await handleSingleRowCopy(item, rowBtn);
+            const copyBtn = e.target.closest('button[data-act="copy-row"]');
+            if (copyBtn) {
+                const sig = copyBtn.getAttribute('data-sig');
+                const item = state.extractedKeys.find((k) => k.sig === sig);
+                if (item) {
+                    await handleSingleRowCopy(item, copyBtn);
+                }
+                return;
             }
         });
 
@@ -869,9 +929,11 @@
                     contributor = '',
                     date = '';
 
-                // 获取该行原网页中的最后一个按钮（即“复制详情”按钮）
+                // 获取该行原网页中的操作按钮（倒数第 3 个为“测试”按钮，最后一个为“复制详情”按钮）
                 const rowButtons = [...row.querySelectorAll('button')];
                 const lastBtn = rowButtons.length > 0 ? rowButtons[rowButtons.length - 1] : null;
+                const testBtn = rowButtons.find((b) => b.getAttribute('title') === '测试') ||
+                    (rowButtons.length >= 3 ? rowButtons[rowButtons.length - 3] : null);
 
                 if (tds.length >= 8) {
                     // 第三方代理表格 (来源, 类型, API地址, 模型, 密钥, 状态, 贡献者, 日期, 操作)
@@ -914,6 +976,7 @@
                     contributor: contributor || '-',
                     date: date || '-',
                     lastBtn,
+                    testBtn,
                 });
             }
         }
@@ -984,18 +1047,91 @@
                     <td>${statusBadge}</td>
                     <td style="color: #64748b; font-size: 11.5px; white-space: nowrap;">${escapeHtml(k.date)}</td>
                     <td style="text-align: center; white-space: nowrap;">
-                        <button class="rp-row-btn" data-act="copy-row" data-sig="${escapeHtml(k.sig)}" title="模拟点击原网页末尾按钮，复制并更新此行数据">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect>
-                                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
-                            </svg>
-                            <span>复制详情</span>
-                        </button>
+                        <div class="rp-row-actions">
+                            <button class="rp-row-btn rp-row-btn-test" data-act="test-row" data-sig="${escapeHtml(k.sig)}" title="模拟点击原网页倒数第3个“测试”按钮，测试此 API Key 有效性并弹出结果">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path>
+                                </svg>
+                                <span>测试</span>
+                            </button>
+                            <button class="rp-row-btn" data-act="copy-row" data-sig="${escapeHtml(k.sig)}" title="模拟点击原网页末尾按钮，复制并更新此行数据">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect>
+                                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                                </svg>
+                                <span>复制详情</span>
+                            </button>
+                        </div>
                     </td>
                 </tr>
             `;
             })
             .join('');
+    }
+
+    /**
+     * 动态查找行对应的“测试”按钮（防止 React 虚拟 DOM 重新渲染后引用失效）
+     */
+    function findLiveRowTestButton(item) {
+        if (item.testBtn && document.contains(item.testBtn)) {
+            return item.testBtn;
+        }
+
+        const pageTables = getPageTables();
+        for (const table of pageTables) {
+            const rows = [...table.querySelectorAll('tr')].filter((r) => !r.querySelector('table'));
+            for (const row of rows) {
+                const text = row.innerText.replace(/\s+/g, ' ');
+                if (text.includes(item.maskedKey) || (item.fullKey && text.includes(item.fullKey.slice(-6)))) {
+                    const buttons = [...row.querySelectorAll('button')];
+                    if (buttons.length > 0) {
+                        const targetBtn = buttons.find((b) => b.getAttribute('title') === '测试') ||
+                            (buttons.length >= 3 ? buttons[buttons.length - 3] : null);
+                        if (targetBtn) {
+                            item.testBtn = targetBtn;
+                            return targetBtn;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 单行点击“测试”：完全模拟触发原网页对应行倒数第三个“测试”按钮，并在页面弹出测试结果
+     */
+    async function handleSingleRowTest(item, btnElement) {
+        const btn = findLiveRowTestButton(item);
+        if (!btn) {
+            showToast('⚠️ 未找到原网页对应的测试按钮，请先展开相应分类');
+            return;
+        }
+
+        const originalHtml = btnElement ? btnElement.innerHTML : '';
+        if (btnElement) {
+            btnElement.disabled = true;
+            btnElement.innerHTML = `
+                <svg class="rp-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+                </svg>
+                <span>测试中...</span>
+            `;
+        }
+
+        try {
+            btn.click();
+        } catch (err) {
+            console.error(LOG_PREFIX, '单行测试出错:', err);
+            showToast(`❌ 测试失败: ${err.message}`);
+        } finally {
+            setTimeout(() => {
+                if (btnElement) {
+                    btnElement.disabled = false;
+                    btnElement.innerHTML = originalHtml;
+                }
+            }, 1800);
+        }
     }
 
     /**
