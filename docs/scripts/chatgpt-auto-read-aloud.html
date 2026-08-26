@@ -38,16 +38,16 @@
 
 <h1>ChatGPT Auto Read Aloud</h1>
 
-<p>在 ChatGPT 页面添加极简半透明 Icon 控制条、快捷键和可选自动朗读。脚本会按当前 ChatGPT 页面实测路径操作：先打开目标回复下方的 <strong>More actions / 更多操作</strong>，再点击菜单里的 <strong>Read aloud / 朗读</strong>，随后自动收起菜单；日常运行保持静默，不显示成功或失败提示。</p>
+<p>这是 <strong>ChatGPT Audio Controls &amp; Read Aloud</strong> 浏览器扩展的轻量 companion userscript。它只跟踪当前页面中新生成的回答，等回答完成后点击该回答已有的朗读按钮，从而启动 ChatGPT 原生 Read Aloud；刷新、切换会话或加载历史消息都不会触发朗读。</p>
 
 <h2 id="info">基本信息</h2>
 
 <table class="info-table">
   <tr><th>脚本名称</th><td>ChatGPT Auto Read Aloud</td></tr>
-  <tr><th>版本</th><td><code>0.1.4</code></td></tr>
+  <tr><th>版本</th><td><code>1.0.0</code></td></tr>
   <tr><th>作者</th><td>TheodorePeng</td></tr>
   <tr><th>适用站点</th><td><code>chatgpt.com/*</code></td></tr>
-  <tr><th>文件大小</th><td>约 1194 行</td></tr>
+  <tr><th>依赖</th><td>推荐安装 <a href="https://github.com/infoxica/chatgpt-audio-controls" target="_blank">ChatGPT Audio Controls &amp; Read Aloud</a></td></tr>
   <tr><th>更新地址</th><td><a href="https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/ChatGPTAutoReadAloud.user.js" target="_blank">Raw 链接</a></td></tr>
 </table>
 
@@ -61,45 +61,42 @@
 <h2 id="features">功能介绍</h2>
 
 <ul>
-  <li><strong>半自动优先</strong>：默认不会自动朗读历史回复，点击 Icon 按钮或快捷键后才朗读最后一条 ChatGPT 回复。</li>
-  <li><strong>轻量 Icon 控制条</strong>：控制条默认出现在 ChatGPT 主内容区域左上角，半透明显示，按钮更小，默认不显示文字。</li>
-  <li><strong>拖拽与位置记忆</strong>：按住控制条拖动即可调整位置，刷新或切换对话后保留上次位置。</li>
-  <li><strong>静默运行</strong>：不再显示“成功 / 失败 / 已点击”等 toast 提示，尽量减少对阅读的干扰。</li>
-  <li><strong>中英文界面兼容</strong>：中文界面走“更多操作 → 朗读”，英文界面走“More actions → Read aloud”。</li>
-  <li><strong>官方朗读路径</strong>：优先点击 ChatGPT 菜单项 <code>data-testid="voice-play-turn-action-button"</code>，文案匹配只是备用方案。</li>
-  <li><strong>快捷键</strong>：<code>Alt + Shift + R</code> 朗读最后回复，<code>Alt + Shift + S</code> 停止当前朗读。</li>
-  <li><strong>可选自动模式</strong>：升级到 v0.1.4 后默认关闭；开启后监听新回复完成，再自动触发朗读；每条回复只处理一次，避免长期驻留页面时反复播放。</li>
-  <li><strong>生成完成判断</strong>：自动模式会等待文本稳定、停止回答按钮消失、目标回复出现 More actions / 更多操作按钮。</li>
-  <li><strong>运行时修复</strong>：v0.1.1 修复 Tampermonkey 沙箱下构造 <code>PointerEvent</code> 时的 <code>view</code> 转换错误；v0.1.2 改进 Read aloud 菜单项点击确认，并在触发后收起 More actions 菜单；v0.1.3 移除页面 toast，并加入拖拽位置记忆；v0.1.4 修复拖拽 pointer capture 抢走按钮点击的问题。</li>
-  <li><strong>停止播放</strong>：暂停并重置页面里的 ChatGPT 隐藏 <code>audio</code> 元素，适合停止官方 Read aloud 音频。</li>
+  <li><strong>自动朗读新回答</strong>：默认开启；只处理脚本运行后由当前页面新发起的回答，每条最多触发一次。</li>
+  <li><strong>原生播放</strong>：优先点击 Audio Controls 扩展为目标回答注入的 <code>.cgpt-inline-readaloud</code>，备用路径只使用回答内部直接可见的 ChatGPT 原生朗读按钮，不实现额外 TTS。</li>
+  <li><strong>新会话安全</strong>：等待任务会跨越新 Chat 的 URL 切换，不会在首次回答生成时重新登记或干预整个会话。</li>
+  <li><strong>历史内容安全</strong>：初始化、刷新、滚动、侧栏切换和加载旧消息时不会朗读已有回答。</li>
+  <li><strong>单一悬浮开关</strong>：页面只显示一枚半透明 Auto/Speaker 按钮；蓝色为开启，灰色为关闭，等待生成时显示轻微动态状态。</li>
+  <li><strong>拖拽与位置记忆</strong>：按住按钮拖动即可调整位置，刷新和切换会话后继续使用上次位置。</li>
+  <li><strong>低频菜单设置</strong>：Tampermonkey 菜单可隐藏原扩展的空闲 Logo、启用裸左右方向键 seek，或重置悬浮按钮位置。</li>
+  <li><strong>安全失败</strong>：找不到目标朗读按钮时只显示短暂错误状态并输出去敏日志，不会循环点击、打开回答菜单或重置页面音频。</li>
 </ul>
 
 <h2 id="usage">使用方法</h2>
 
 <ol>
-  <li>安装脚本后打开任意 ChatGPT 对话页，例如 <code>https://chatgpt.com/c/...</code>。</li>
-  <li>页面主内容区域左上角会出现三枚小尺寸半透明 Icon 按钮：朗读、停止、自动模式。</li>
-  <li>按住控制条拖动即可移动位置，脚本会记住上次放置的位置。</li>
-  <li>鼠标悬浮或键盘 focus 到按钮上时，会显示简短文字提示；平时不显示任何状态文字。</li>
-  <li>点击朗读 Icon，脚本会定位最后一条 ChatGPT 回复，打开它下方的 More actions / 更多操作菜单，点击 Read aloud / 朗读，并自动收起菜单。</li>
-  <li>按 <code>Alt + Shift + R</code> 可以执行同样操作；按 <code>Alt + Shift + S</code> 停止当前朗读。</li>
-  <li>需要全自动时，点击自动模式 Icon 切换开关。开启后只处理之后新生成的回复，不会朗读当前页面已有历史回复。</li>
+  <li>先安装并启用 ChatGPT Audio Controls 扩展，保留它的 Inline Speech Buttons 功能。</li>
+  <li>安装本 userscript 后刷新 <code>https://chatgpt.com/</code>；页面左上侧会出现一枚自动朗读按钮。</li>
+  <li>首次安装默认开启自动朗读；点击按钮可以快速开关，脚本会记住状态。</li>
+  <li>正常发送消息。回答完成并出现该回答的朗读按钮后，脚本会点击一次并验证原生播放器已经启动。</li>
+  <li>按住悬浮按钮拖动可以移动位置；鼠标悬浮或键盘 focus 时会显示当前状态。</li>
+  <li>打开 Tampermonkey 扩展菜单，可以显示或隐藏 Audio Controls 的空闲 Logo、启用裸左右方向键 seek，或重置按钮位置。</li>
 </ol>
 
 <h2 id="notes">注意事项</h2>
 
 <ul>
-  <li>自动朗读默认关闭，且 v0.1.4 使用新的设置键，升级后会重置为关闭，避免打开历史对话或页面重渲染时误读旧回复。</li>
-  <li>ChatGPT 前端更新可能改变 DOM 结构，尤其是 <code>conversation-turn</code>、<code>More actions</code> 菜单和 <code>voice-play-turn-action-button</code>。</li>
-  <li>脚本静默运行；如果没有声音，可能是浏览器音频权限或 ChatGPT 音频状态限制，请先手动点一次 ChatGPT 自带 Read aloud 验证页面是否能正常播放。</li>
+  <li>升级时会继承 v0.1.4 已保存的自动朗读状态和悬浮位置；没有旧状态时默认开启。</li>
+  <li>隐藏扩展 Logo 只影响 <code>#cgpt-ra-floating-toggle</code>，不会隐藏回答朗读按钮或播放中的进度、暂停、倍速和音量控件。</li>
+  <li>裸左右方向键默认关闭。开启后也只在焦点不处于输入框、按钮、菜单等交互区域且扩展 seek 按钮可用时生效。</li>
+  <li>如果扩展未安装、Inline Speech Buttons 被关闭或 ChatGPT 页面结构改变，自动朗读会安全失败；脚本不会退回到容易干扰页面的菜单模拟方案。</li>
 </ul>
 
 <div class="tip">
-  推荐日常使用半自动模式：需要听最后一条回复时按 <code>Alt + Shift + R</code>。自动模式适合你明确希望每条新回复都自动朗读的场景。
+  自动朗读开关只控制之后的新回答。关闭时不会停止已经在播放的内容；重新开启时也不会追读页面上已经存在的回答。
 </div>
 
 <div class="warning">
-  本脚本依赖 ChatGPT 网页 DOM，不调用 OpenAI API，也不修改对话内容。若 ChatGPT 页面改版导致按钮找不到，需要更新选择器。
+  本脚本不调用 OpenAI API、不读取或上传对话内容，也不修改 ChatGPT Audio Controls 扩展源码。它只在本地观察生成状态并点击目标回答现有的朗读按钮。
 </div>
 
 </main>

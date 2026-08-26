@@ -216,8 +216,8 @@ window.SCRIPTS_CATALOG = [
         id: 'chatgpt-auto-read-aloud',
         name: 'ChatGPT Auto Read Aloud',
         file: 'scripts/chatgpt-auto-read-aloud.html',
-        desc: '在 ChatGPT 页面添加可拖拽记忆位置的极简半透明 Icon 朗读按钮，静默触发 More actions / 更多操作 → Read aloud / 朗读。',
-        version: '0.1.4',
+        desc: '配合 ChatGPT Audio Controls，在新回答完成后自动触发原生 Read Aloud，并提供可拖拽开关与低频 Tampermonkey 设置。',
+        version: '1.0.0',
         sites: 'chatgpt.com/*',
       },
       {

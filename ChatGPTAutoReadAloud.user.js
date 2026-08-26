@@ -1,15 +1,17 @@
 // ==UserScript==
 // @name         ChatGPT Auto Read Aloud
 // @namespace    http://tampermonkey.net/
-// @version      0.1.4
-// @description  Add manual shortcuts and optional auto-read for the latest ChatGPT response via More actions -> Read aloud.
+// @version      1.0.0
+// @description  Automatically start native ChatGPT Read Aloud for newly completed replies through ChatGPT Audio Controls.
 // @author       TheodorePeng
 // @match        https://chatgpt.com/*
 // @run-at       document-idle
 // @grant        GM_addStyle
 // @grant        GM_registerMenuCommand
+// @grant        GM_unregisterMenuCommand
 // @grant        GM_getValue
 // @grant        GM_setValue
+// @grant        GM_addValueChangeListener
 // @noframes
 // @updateURL    https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/ChatGPTAutoReadAloud.user.js
 // @downloadURL  https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/ChatGPTAutoReadAloud.user.js
@@ -18,455 +20,575 @@
 (function () {
     'use strict';
 
-    const SCRIPT_PREFIX = '[ChatGPTAutoReadAloud]';
-    const SCRIPT_VERSION = '0.1.4';
-    const STORAGE_AUTO_READ = 'chatgpt-auto-read-aloud:v0.1.4:autoReadEnabled';
-    const STORAGE_CONTROL_POSITION = 'chatgpt-auto-read-aloud:controlPosition';
+    const PREFIX = '[ChatGPTAutoReadAloud]';
+    const VERSION = '1.0.0';
 
-    const TURN_SELECTOR = 'section[data-testid^="conversation-turn-"]';
-    const ASSISTANT_SELECTOR = '[data-message-author-role="assistant"]';
-    const MORE_ACTIONS_LABEL_RE = /^(更多操作|More actions)$/i;
-    const MORE_ACTIONS_FALLBACK_RE = /(更多|more actions|more)/i;
-    const READ_ALOUD_LABEL_RE = /^(朗读|Read aloud)$/i;
-    const STOP_GENERATING_LABEL_RE = /(停止回答|停止生成|Stop generating|Stop responding)/i;
-    const VOICE_PLAY_TESTID = 'voice-play-turn-action-button';
-    const CHATGPT_BLOB_AUDIO_RE = /^blob:https:\/\/chatgpt\.com\//;
+    const STORAGE = Object.freeze({
+        autoRead: 'chatgpt-auto-read-aloud:auto-read-enabled',
+        hideExtensionToggle: 'chatgpt-auto-read-aloud:hide-extension-toggle',
+        bareArrowSeek: 'chatgpt-auto-read-aloud:bare-arrow-seek-enabled',
+        position: 'chatgpt-auto-read-aloud:floating-position',
+        migration: 'chatgpt-auto-read-aloud:migration-v1',
+    });
 
-    const ROOT_ID = 'cgpt-read-aloud-root';
-    const STYLE_ID = 'cgpt-read-aloud-style';
+    const LEGACY_STORAGE = Object.freeze({
+        autoRead: 'chatgpt-auto-read-aloud:v0.1.4:autoReadEnabled',
+        position: 'chatgpt-auto-read-aloud:controlPosition',
+    });
 
-    const AUTO_SAMPLE_INTERVAL_MS = 700;
-    const AUTO_STABLE_SAMPLE_COUNT = 3;
-    const AUTO_READY_TIMEOUT_MS = 24000;
-    const AUTO_DEBOUNCE_MS = 300;
-    const MENU_WAIT_TIMEOUT_MS = 3500;
-    const AUDIO_DETECT_TIMEOUT_MS = 3500;
-    const READ_ITEM_NATIVE_CONFIRM_MS = 1200;
-    const MENU_CLOSE_DELAY_MS = 160;
+    const SELECTORS = Object.freeze({
+        assistant: '[data-message-author-role="assistant"]',
+        composer: '#prompt-textarea, [data-testid="composer-text-input"]',
+        sendButton: 'button[data-testid="send-button"]',
+        extensionRead: '.cgpt-inline-readaloud',
+        extensionToggle: '#cgpt-ra-floating-toggle',
+        seekBack: '.cgpt-ra-back',
+        seekForward: '.cgpt-ra-forward',
+        nativeRead: '[data-testid="voice-play-turn-action-button"]',
+    });
+
+    const ROOT_ID = 'cgpt-auto-read-aloud-root';
+    const STYLE_ID = 'cgpt-auto-read-aloud-style';
+    const HIDE_ATTRIBUTE = 'data-cgpt-ara-hide-extension-toggle';
+    const MISSING = '__CGPT_ARA_MISSING__';
+
+    const TASK_TIMEOUT_MS = 10 * 60 * 1000;
+    const INTENT_TIMEOUT_MS = 30 * 1000;
+    const TEXT_STABLE_MS = 1000;
+    const CONTROL_WAIT_MS = 8000;
+    const PLAYBACK_VERIFY_MS = 4000;
+    const CHECK_DEBOUNCE_MS = 120;
+    const ERROR_STATE_MS = 3000;
     const DRAG_THRESHOLD_PX = 4;
 
-    const processedTurns = new Set();
-    const pendingTurnIds = new Set();
-    const seenAssistantTurnIds = new Set();
+    const STOP_GENERATING_RE = /(停止回答|停止生成|停止回应|Stop generating|Stop responding)/i;
+    const GENERATION_ACTION_RE = /(重新生成|重新回答|重试|继续生成|继续回答|Regenerate|Try again|Continue generating|Continue response)/i;
+    const READ_ALOUD_RE = /^(朗读|Read aloud|Read out loud)$/i;
+    const INTERACTIVE_SELECTOR = [
+        'input',
+        'textarea',
+        'select',
+        'button',
+        'a',
+        '[contenteditable="true"]',
+        '[role="textbox"]',
+        '[role="button"]',
+        '[role="link"]',
+        '[role="menu"]',
+        '[role="menuitem"]',
+        '[role="dialog"]',
+        '[role="slider"]',
+        '[role="listbox"]',
+        '[role="option"]',
+    ].join(',');
 
-    let autoReadEnabled = readStoredBoolean(STORAGE_AUTO_READ, false);
+    let settings = null;
+    let pendingTask = null;
+    let taskSequence = 0;
+    let generationWasActive = false;
     let observer = null;
-    let autoCheckTimer = 0;
-    let autoBusy = false;
-    let actionInFlight = false;
-    let lastLocationHref = window.location.href;
-    let controlPositionTimer = 0;
-    let controlPosition = readStoredJson(STORAGE_CONTROL_POSITION, null);
+    let checkTimer = 0;
+    let errorTimer = 0;
+    let visualState = 'idle';
     let dragState = null;
     let suppressNextClick = false;
+    let menuIds = [];
+    let stylesInstalled = false;
 
     init();
 
     function init() {
-        injectStyles();
-        renderControls();
+        migrateSettings();
+        settings = readSettings();
+        installStyles();
+        applyExtensionToggleVisibility();
+        ensureToggleMounted();
         registerMenuCommands();
-        bindKeyboardShortcuts();
-        seedProcessedTurns();
-        seedSeenAssistantTurnIds();
-        observePageChanges();
-        observeRouteChanges();
-        bindLayoutListeners();
-        updateAutoButton();
-        updateControlPosition();
-        log('Loaded v' + SCRIPT_VERSION + '. Auto read: ' + (autoReadEnabled ? 'on' : 'off'));
+        registerValueListeners();
+        bindGlobalEvents();
+        generationWasActive = isGenerationActive();
+        startObserver();
+        updateToggleState();
+        log('Loaded v' + VERSION + '.', {
+            autoRead: settings.autoRead,
+            hideExtensionToggle: settings.hideExtensionToggle,
+            bareArrowSeek: settings.bareArrowSeek,
+        });
     }
 
-    function log() {
-        console.log(SCRIPT_PREFIX, ...arguments);
+    function log(message, details) {
+        if (details === undefined) {
+            console.log(PREFIX, message);
+        } else {
+            console.log(PREFIX, message, details);
+        }
     }
 
-    function readStoredBoolean(key, fallback) {
+    function warn(message, details) {
+        if (details === undefined) {
+            console.warn(PREFIX, message);
+        } else {
+            console.warn(PREFIX, message, details);
+        }
+    }
+
+    function gmRead(key, fallback) {
         try {
             if (typeof GM_getValue === 'function') {
-                return Boolean(GM_getValue(key, fallback));
+                return GM_getValue(key, fallback);
             }
             const raw = window.localStorage.getItem(key);
-            return raw === null ? fallback : raw === 'true';
+            return raw === null ? fallback : raw;
         } catch (error) {
-            console.warn(SCRIPT_PREFIX, 'Failed to read storage:', error);
+            warn('Unable to read a saved setting.', { key, error: String(error) });
             return fallback;
         }
     }
 
-    function writeStoredBoolean(key, value) {
+    function gmWrite(key, value) {
         try {
             if (typeof GM_setValue === 'function') {
-                GM_setValue(key, Boolean(value));
+                GM_setValue(key, value);
                 return;
             }
-            window.localStorage.setItem(key, value ? 'true' : 'false');
-        } catch (error) {
-            console.warn(SCRIPT_PREFIX, 'Failed to write storage:', error);
-        }
-    }
-
-    function readStoredJson(key, fallback) {
-        try {
-            const raw = typeof GM_getValue === 'function'
-                ? GM_getValue(key, null)
-                : window.localStorage.getItem(key);
-            if (!raw) return fallback;
-            return typeof raw === 'string' ? JSON.parse(raw) : raw;
-        } catch (error) {
-            console.warn(SCRIPT_PREFIX, 'Failed to read JSON storage:', error);
-            return fallback;
-        }
-    }
-
-    function writeStoredJson(key, value) {
-        try {
-            const payload = JSON.stringify(value);
-            if (typeof GM_setValue === 'function') {
-                GM_setValue(key, payload);
-                return;
-            }
+            const payload = typeof value === 'string' ? value : JSON.stringify(value);
             window.localStorage.setItem(key, payload);
         } catch (error) {
-            console.warn(SCRIPT_PREFIX, 'Failed to write JSON storage:', error);
+            warn('Unable to save a setting.', { key, error: String(error) });
         }
+    }
+
+    function readBoolean(key, fallback) {
+        const value = gmRead(key, MISSING);
+        if (value === MISSING) return fallback;
+        if (typeof value === 'string') return value === 'true';
+        return Boolean(value);
+    }
+
+    function readPosition(key) {
+        const value = gmRead(key, null);
+        if (!value) return null;
+
+        try {
+            const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+            if (parsed && Number.isFinite(parsed.left) && Number.isFinite(parsed.top)) {
+                return { left: parsed.left, top: parsed.top };
+            }
+        } catch (error) {
+            warn('Ignoring an invalid saved position.', { error: String(error) });
+        }
+
+        return null;
+    }
+
+    function migrateSettings() {
+        if (readBoolean(STORAGE.migration, false)) return;
+
+        if (gmRead(STORAGE.autoRead, MISSING) === MISSING) {
+            const legacyAutoRead = gmRead(LEGACY_STORAGE.autoRead, MISSING);
+            gmWrite(
+                STORAGE.autoRead,
+                legacyAutoRead === MISSING
+                    ? true
+                    : (typeof legacyAutoRead === 'string' ? legacyAutoRead === 'true' : Boolean(legacyAutoRead)),
+            );
+        }
+
+        if (gmRead(STORAGE.position, MISSING) === MISSING) {
+            const legacyPosition = readPosition(LEGACY_STORAGE.position);
+            if (legacyPosition) gmWrite(STORAGE.position, legacyPosition);
+        }
+
+        if (gmRead(STORAGE.hideExtensionToggle, MISSING) === MISSING) {
+            gmWrite(STORAGE.hideExtensionToggle, false);
+        }
+
+        if (gmRead(STORAGE.bareArrowSeek, MISSING) === MISSING) {
+            gmWrite(STORAGE.bareArrowSeek, false);
+        }
+
+        gmWrite(STORAGE.migration, true);
+    }
+
+    function readSettings() {
+        return {
+            autoRead: readBoolean(STORAGE.autoRead, true),
+            hideExtensionToggle: readBoolean(STORAGE.hideExtensionToggle, false),
+            bareArrowSeek: readBoolean(STORAGE.bareArrowSeek, false),
+            position: readPosition(STORAGE.position),
+        };
+    }
+
+    function registerValueListeners() {
+        if (typeof GM_addValueChangeListener !== 'function') return;
+
+        GM_addValueChangeListener(STORAGE.autoRead, (_key, _oldValue, newValue, remote) => {
+            if (!remote) return;
+            applyAutoReadSetting(coerceBoolean(newValue), true);
+        });
+
+        GM_addValueChangeListener(STORAGE.hideExtensionToggle, (_key, _oldValue, newValue, remote) => {
+            if (!remote) return;
+            settings.hideExtensionToggle = coerceBoolean(newValue);
+            applyExtensionToggleVisibility();
+            registerMenuCommands();
+        });
+
+        GM_addValueChangeListener(STORAGE.bareArrowSeek, (_key, _oldValue, newValue, remote) => {
+            if (!remote) return;
+            settings.bareArrowSeek = coerceBoolean(newValue);
+            registerMenuCommands();
+        });
+
+        GM_addValueChangeListener(STORAGE.position, (_key, _oldValue, newValue, remote) => {
+            if (!remote || dragState) return;
+            settings.position = parsePositionValue(newValue);
+            updateTogglePosition();
+        });
+    }
+
+    function parsePositionValue(value) {
+        try {
+            const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+            return parsed && Number.isFinite(parsed.left) && Number.isFinite(parsed.top)
+                ? { left: parsed.left, top: parsed.top }
+                : null;
+        } catch (_error) {
+            return null;
+        }
+    }
+
+    function coerceBoolean(value) {
+        return typeof value === 'string' ? value === 'true' : Boolean(value);
     }
 
     function registerMenuCommands() {
         if (typeof GM_registerMenuCommand !== 'function') return;
 
-        GM_registerMenuCommand('朗读 ChatGPT 最后回复', () => {
-            void readLastAssistantTurn('menu');
-        });
-        GM_registerMenuCommand('停止 ChatGPT 朗读', () => {
-            stopPlayback();
-        });
-        GM_registerMenuCommand('切换自动朗读', () => {
-            setAutoReadEnabled(!autoReadEnabled);
-        });
-    }
-
-    function bindKeyboardShortcuts() {
-        window.addEventListener('keydown', (event) => {
-            if (event.repeat) return;
-            if (!event.altKey || !event.shiftKey) return;
-
-            const key = String(event.key || '').toLowerCase();
-            if (key === 'r') {
-                event.preventDefault();
-                event.stopPropagation();
-                void readLastAssistantTurn('shortcut');
-            } else if (key === 's') {
-                event.preventDefault();
-                event.stopPropagation();
-                stopPlayback();
+        if (menuIds.length && typeof GM_unregisterMenuCommand === 'function') {
+            for (const id of menuIds) {
+                try {
+                    GM_unregisterMenuCommand(id);
+                } catch (_error) {
+                    // A stale menu id is harmless.
+                }
             }
-        }, true);
-    }
-
-    function renderControls() {
-        if (document.getElementById(ROOT_ID)) return;
-
-        const root = document.createElement('div');
-        root.id = ROOT_ID;
-        root.tabIndex = -1;
-        root.innerHTML = [
-            '<div class="cgpt-ra-panel" role="group" aria-label="ChatGPT 朗读控制">',
-            '  <button type="button" class="cgpt-ra-btn cgpt-ra-primary" data-action="read" aria-label="朗读最后回复 (Alt+Shift+R)" title="朗读最后回复 (Alt+Shift+R)" data-tooltip="朗读最后回复">',
-            '    <svg class="cgpt-ra-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10H4z"></path><path d="M16.2 8.2a4 4 0 0 1 0 7.6"></path><path d="M18.8 5.6a8 8 0 0 1 0 12.8"></path></svg>',
-            '  </button>',
-            '  <button type="button" class="cgpt-ra-btn" data-action="stop" aria-label="停止朗读 (Alt+Shift+S)" title="停止朗读 (Alt+Shift+S)" data-tooltip="停止朗读">',
-            '    <svg class="cgpt-ra-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="2"></rect></svg>',
-            '  </button>',
-            '  <button type="button" class="cgpt-ra-btn cgpt-ra-toggle" data-action="toggle-auto" aria-label="自动朗读：关" title="自动朗读：关" data-tooltip="自动朗读：关">',
-            '    <svg class="cgpt-ra-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17h2.1l.9-2.6h6l.9 2.6H18L13.2 6h-2.4L6 17z"></path><path d="M9.7 12.5h4.6L12 7.6l-2.3 4.9z"></path><path d="M19 8c1.3 2.4 1.3 5.6 0 8"></path></svg>',
-            '  </button>',
-            '</div>',
-        ].join('');
-
-        root.querySelector('[data-action="read"]').addEventListener('click', () => {
-            if (consumeSuppressedClick()) return;
-            void readLastAssistantTurn('button');
-        });
-        root.querySelector('[data-action="stop"]').addEventListener('click', () => {
-            if (consumeSuppressedClick()) return;
-            stopPlayback();
-        });
-        root.querySelector('[data-action="toggle-auto"]').addEventListener('click', () => {
-            if (consumeSuppressedClick()) return;
-            setAutoReadEnabled(!autoReadEnabled);
-        });
-
-        (document.body || document.documentElement).appendChild(root);
-        bindControlDrag(root);
-        updateAutoButton();
-        updateControlPosition();
-    }
-
-    function updateControlsBusy(isBusy) {
-        const root = document.getElementById(ROOT_ID);
-        if (!root) return;
-        const readButton = root.querySelector('[data-action="read"]');
-        if (readButton) {
-            readButton.disabled = Boolean(isBusy);
-            const label = isBusy ? '正在处理朗读请求' : '朗读最后回复 (Alt+Shift+R)';
-            readButton.setAttribute('aria-label', label);
-            readButton.setAttribute('title', label);
-            readButton.dataset.tooltip = isBusy ? '处理中...' : '朗读最后回复';
-            readButton.classList.toggle('is-busy', Boolean(isBusy));
-        }
-    }
-
-    function updateAutoButton() {
-        const button = document.querySelector('#' + ROOT_ID + ' [data-action="toggle-auto"]');
-        if (!button) return;
-        const label = autoReadEnabled ? '自动朗读：开' : '自动朗读：关';
-        button.setAttribute('aria-pressed', autoReadEnabled ? 'true' : 'false');
-        button.setAttribute('aria-label', label);
-        button.setAttribute('title', label);
-        button.dataset.tooltip = label;
-        button.classList.toggle('is-on', autoReadEnabled);
-    }
-
-    function setAutoReadEnabled(enabled) {
-        autoReadEnabled = Boolean(enabled);
-        writeStoredBoolean(STORAGE_AUTO_READ, autoReadEnabled);
-        updateAutoButton();
-
-        if (autoReadEnabled) {
-            seedProcessedTurns();
-            seedSeenAssistantTurnIds();
-            scheduleAutoCheck();
-        }
-    }
-
-    async function readLastAssistantTurn(source) {
-        if (actionInFlight) {
+            menuIds = [];
+        } else if (menuIds.length) {
             return;
         }
 
-        actionInFlight = true;
-        updateControlsBusy(true);
-
-        try {
-            const turn = getLastAssistantTurn();
-            if (!turn) {
-                return;
-            }
-
-            if (isGeneratingVisible()) {
-                return;
-            }
-
-            await triggerReadForTurn(turn, source || 'manual');
-        } catch (error) {
-            console.warn(SCRIPT_PREFIX, 'Read failed:', error);
-        } finally {
-            actionInFlight = false;
-            updateControlsBusy(false);
-        }
+        menuIds.push(GM_registerMenuCommand(
+            '自动朗读：' + (settings.autoRead ? '开（点击关闭）' : '关（点击开启）'),
+            () => setAutoReadEnabled(!settings.autoRead),
+        ));
+        menuIds.push(GM_registerMenuCommand(
+            '原扩展图标：' + (settings.hideExtensionToggle ? '隐藏（点击显示）' : '显示（点击隐藏）'),
+            () => setHideExtensionToggle(!settings.hideExtensionToggle),
+        ));
+        menuIds.push(GM_registerMenuCommand(
+            '裸方向键 ±10 秒：' + (settings.bareArrowSeek ? '开（点击关闭）' : '关（点击开启）'),
+            () => setBareArrowSeekEnabled(!settings.bareArrowSeek),
+        ));
+        menuIds.push(GM_registerMenuCommand('重置自动朗读按钮位置', resetTogglePosition));
     }
 
-    async function triggerReadForTurn(turn, source) {
-        if (!turn || !document.contains(turn)) {
-            throw new Error('目标回复不存在');
-        }
-
-        stopPlayback();
-        closeOpenMenus();
-
-        turn.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' });
-        await delay(120);
-
-        const moreButton = await waitForElement(() => findMoreActionsButton(turn), MENU_WAIT_TIMEOUT_MS);
-        if (!moreButton) {
-            throw new Error('未找到 More actions / 更多操作按钮');
-        }
-
-        const audioBaseline = captureAudioBaseline();
-        dispatchHumanLikeClick(moreButton);
-
-        const readItem = await waitForElement(findReadAloudMenuItem, MENU_WAIT_TIMEOUT_MS);
-        if (!readItem) {
-            throw new Error('未找到 Read aloud / 朗读菜单项');
-        }
-
-        let audioDetected = await clickReadAloudMenuItem(readItem, audioBaseline);
-        await closeMenuAfterRead(moreButton, readItem);
-
-        if (!audioDetected) {
-            audioDetected = await waitForAudioSignal(AUDIO_DETECT_TIMEOUT_MS, audioBaseline);
-        }
-
-        const finalKey = buildTurnKey(turn);
-        if (finalKey) processedTurns.add(finalKey);
-
-        log('Triggered read aloud from ' + source + '.', { audioDetected });
-        return { audioDetected };
+    function setAutoReadEnabled(enabled) {
+        const nextValue = Boolean(enabled);
+        gmWrite(STORAGE.autoRead, nextValue);
+        applyAutoReadSetting(nextValue, true);
     }
 
-    function stopPlayback() {
-        const audios = Array.from(document.querySelectorAll('audio'));
-        let touched = 0;
+    function applyAutoReadSetting(enabled, refreshMenus) {
+        settings.autoRead = Boolean(enabled);
+        if (!settings.autoRead) cancelPendingTask('disabled');
+        visualState = pendingTask ? 'waiting' : 'idle';
+        updateToggleState();
+        if (refreshMenus) registerMenuCommands();
+    }
 
-        for (const audio of audios) {
-            const src = audio.currentSrc || audio.src || '';
-            const lookedRelevant = CHATGPT_BLOB_AUDIO_RE.test(src) || src === '' || audio.currentTime > 0;
-            if (!lookedRelevant) continue;
+    function setHideExtensionToggle(hidden) {
+        settings.hideExtensionToggle = Boolean(hidden);
+        gmWrite(STORAGE.hideExtensionToggle, settings.hideExtensionToggle);
+        applyExtensionToggleVisibility();
+        registerMenuCommands();
+    }
 
-            try {
-                if (!audio.paused || audio.currentTime > 0) touched += 1;
-                audio.pause();
-                if (Number.isFinite(audio.duration) || audio.currentTime > 0) {
-                    audio.currentTime = 0;
+    function setBareArrowSeekEnabled(enabled) {
+        settings.bareArrowSeek = Boolean(enabled);
+        gmWrite(STORAGE.bareArrowSeek, settings.bareArrowSeek);
+        registerMenuCommands();
+    }
+
+    function resetTogglePosition() {
+        settings.position = null;
+        gmWrite(STORAGE.position, null);
+        updateTogglePosition();
+    }
+
+    function applyExtensionToggleVisibility() {
+        document.documentElement.setAttribute(
+            HIDE_ATTRIBUTE,
+            settings.hideExtensionToggle ? 'true' : 'false',
+        );
+    }
+
+    function installStyles() {
+        if (stylesInstalled || document.getElementById(STYLE_ID)) return;
+        stylesInstalled = true;
+
+        const css = `
+            html[${HIDE_ATTRIBUTE}="true"] ${SELECTORS.extensionToggle} {
+                display: none !important;
+            }
+
+            #${ROOT_ID} {
+                position: fixed;
+                left: var(--cgpt-ara-left, 64px);
+                top: var(--cgpt-ara-top, 64px);
+                z-index: 2147483647;
+                width: 34px;
+                height: 34px;
+                color: rgba(16, 24, 40, 0.72);
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                touch-action: none;
+                user-select: none;
+            }
+
+            #${ROOT_ID} .cgpt-ara-toggle {
+                position: relative;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 34px;
+                height: 34px;
+                padding: 0;
+                border: 1px solid rgba(20, 28, 44, 0.16);
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.34);
+                box-shadow: 0 8px 20px rgba(20, 28, 44, 0.1);
+                backdrop-filter: blur(10px) saturate(125%);
+                -webkit-backdrop-filter: blur(10px) saturate(125%);
+                color: inherit;
+                cursor: grab;
+                opacity: 0.5;
+                transition: opacity 0.16s ease, background 0.16s ease, border-color 0.16s ease,
+                    color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
+            }
+
+            #${ROOT_ID} .cgpt-ara-toggle:hover,
+            #${ROOT_ID} .cgpt-ara-toggle:focus-visible {
+                opacity: 0.94;
+                outline: none;
+                transform: translateY(-1px);
+                box-shadow: 0 10px 24px rgba(20, 28, 44, 0.16);
+            }
+
+            #${ROOT_ID}[data-state="on"] .cgpt-ara-toggle,
+            #${ROOT_ID}[data-state="waiting"] .cgpt-ara-toggle {
+                border-color: rgba(36, 99, 235, 0.34);
+                background: rgba(36, 99, 235, 0.16);
+                color: #1d4ed8;
+            }
+
+            #${ROOT_ID}[data-state="waiting"] .cgpt-ara-toggle {
+                animation: cgpt-ara-pulse 1.15s ease-in-out infinite;
+            }
+
+            #${ROOT_ID}[data-state="error"] .cgpt-ara-toggle {
+                border-color: rgba(217, 119, 6, 0.42);
+                background: rgba(245, 158, 11, 0.18);
+                color: #b45309;
+                opacity: 0.94;
+            }
+
+            #${ROOT_ID}.is-dragging .cgpt-ara-toggle {
+                cursor: grabbing;
+                opacity: 0.98;
+                transform: scale(1.04);
+                animation: none;
+            }
+
+            #${ROOT_ID} .cgpt-ara-icon {
+                width: 17px;
+                height: 17px;
+                fill: none;
+                stroke: currentColor;
+                stroke-width: 1.7;
+                stroke-linecap: round;
+                stroke-linejoin: round;
+                pointer-events: none;
+            }
+
+            #${ROOT_ID} .cgpt-ara-toggle::after {
+                position: absolute;
+                left: 50%;
+                top: calc(100% + 8px);
+                width: max-content;
+                max-width: 210px;
+                padding: 5px 7px;
+                border-radius: 6px;
+                background: rgba(16, 24, 40, 0.86);
+                color: #fff;
+                content: attr(data-tooltip);
+                font-size: 11px;
+                line-height: 1.3;
+                opacity: 0;
+                pointer-events: none;
+                transform: translate(-50%, -3px);
+                transition: opacity 0.14s ease, transform 0.14s ease;
+                white-space: nowrap;
+            }
+
+            #${ROOT_ID} .cgpt-ara-toggle:hover::after,
+            #${ROOT_ID} .cgpt-ara-toggle:focus-visible::after {
+                opacity: 1;
+                transform: translate(-50%, 0);
+            }
+
+            @keyframes cgpt-ara-pulse {
+                0%, 100% { box-shadow: 0 8px 20px rgba(37, 99, 235, 0.12); }
+                50% { box-shadow: 0 8px 24px rgba(37, 99, 235, 0.34); }
+            }
+
+            @media (prefers-color-scheme: dark) {
+                #${ROOT_ID} .cgpt-ara-toggle {
+                    border-color: rgba(255, 255, 255, 0.18);
+                    background: rgba(20, 20, 24, 0.38);
+                    color: rgba(255, 255, 255, 0.72);
                 }
-            } catch (error) {
-                console.warn(SCRIPT_PREFIX, 'Failed to stop audio:', error);
+
+                #${ROOT_ID}[data-state="on"] .cgpt-ara-toggle,
+                #${ROOT_ID}[data-state="waiting"] .cgpt-ara-toggle {
+                    border-color: rgba(96, 165, 250, 0.48);
+                    background: rgba(37, 99, 235, 0.24);
+                    color: #93c5fd;
+                }
             }
+
+            @media (prefers-reduced-motion: reduce) {
+                #${ROOT_ID} .cgpt-ara-toggle {
+                    transition: none;
+                }
+
+                #${ROOT_ID}[data-state="waiting"] .cgpt-ara-toggle {
+                    animation: none;
+                }
+            }
+        `;
+
+        if (typeof GM_addStyle === 'function') {
+            GM_addStyle(css);
+            return;
         }
 
-        return touched;
+        const style = document.createElement('style');
+        style.id = STYLE_ID;
+        style.textContent = css;
+        document.documentElement.appendChild(style);
     }
 
-    function getAssistantTurns() {
-        return Array.from(document.querySelectorAll(TURN_SELECTOR))
-            .filter((turn) => turn.querySelector(ASSISTANT_SELECTOR));
+    function ensureToggleMounted() {
+        let root = document.getElementById(ROOT_ID);
+        if (root) return root;
+
+        root = document.createElement('div');
+        root.id = ROOT_ID;
+        root.dataset.version = VERSION;
+        root.innerHTML = `
+            <button type="button" class="cgpt-ara-toggle" aria-label="自动朗读：开"
+                aria-pressed="true" aria-busy="false" data-tooltip="自动朗读：开">
+                <svg class="cgpt-ara-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 17h2.1l.9-2.6h6l.9 2.6H18L13.2 6h-2.4L6 17z"></path>
+                    <path d="M9.7 12.5h4.6L12 7.6l-2.3 4.9z"></path>
+                    <path d="M19 8c1.3 2.4 1.3 5.6 0 8"></path>
+                </svg>
+            </button>
+        `;
+
+        const button = root.querySelector('.cgpt-ara-toggle');
+        button.addEventListener('click', handleToggleClick);
+        root.addEventListener('pointerdown', handlePointerDown);
+        root.addEventListener('click', suppressDraggedClick, true);
+
+        (document.body || document.documentElement).appendChild(root);
+        updateTogglePosition();
+        updateToggleState();
+        return root;
     }
 
-    function getLastAssistantTurn() {
-        const turns = getAssistantTurns();
-        return turns.length ? turns[turns.length - 1] : null;
+    function handleToggleClick() {
+        if (consumeSuppressedClick()) return;
+        setAutoReadEnabled(!settings.autoRead);
     }
 
-    function getTurnText(turn) {
-        const assistantBlocks = Array.from(turn.querySelectorAll(ASSISTANT_SELECTOR));
-        if (!assistantBlocks.length) return '';
-        return normalizeText(assistantBlocks.map((block) => block.innerText || block.textContent || '').join('\n'));
+    function updateToggleState() {
+        const root = document.getElementById(ROOT_ID);
+        if (!root) return;
+
+        const button = root.querySelector('.cgpt-ara-toggle');
+        if (!button) return;
+
+        const state = visualState === 'error'
+            ? 'error'
+            : (!settings.autoRead ? 'off' : (pendingTask ? 'waiting' : 'on'));
+        const label = state === 'error'
+            ? '自动朗读：触发失败'
+            : (state === 'waiting' ? '自动朗读：等待回答完成' : '自动朗读：' + (settings.autoRead ? '开' : '关'));
+
+        root.dataset.version = VERSION;
+        root.dataset.state = state;
+        button.setAttribute('aria-label', label);
+        button.setAttribute('aria-pressed', settings.autoRead ? 'true' : 'false');
+        button.setAttribute('aria-busy', state === 'waiting' ? 'true' : 'false');
+        button.setAttribute('title', label);
+        button.dataset.tooltip = label;
     }
 
-    function getTurnId(turn) {
-        return turn && turn.getAttribute('data-testid') || '';
+    function showErrorState(message) {
+        window.clearTimeout(errorTimer);
+        visualState = 'error';
+        updateToggleState();
+        warn(message);
+        errorTimer = window.setTimeout(() => {
+            visualState = 'idle';
+            updateToggleState();
+        }, ERROR_STATE_MS);
     }
 
-    function buildTurnKey(turn) {
-        const turnId = getTurnId(turn);
-        const text = getTurnText(turn);
-        if (!turnId || !text) return '';
-        return window.location.pathname + '::' + turnId + '::' + hashText(text);
-    }
-
-    function seedProcessedTurns() {
-        for (const turn of getAssistantTurns()) {
-            const key = buildTurnKey(turn);
-            if (key) processedTurns.add(key);
-        }
-    }
-
-    function seedSeenAssistantTurnIds() {
-        for (const turn of getAssistantTurns()) {
-            const turnId = getTurnId(turn);
-            if (turnId) seenAssistantTurnIds.add(turnId);
-        }
-    }
-
-    function observePageChanges() {
-        if (observer) observer.disconnect();
-        observer = new MutationObserver(() => {
-            ensureControlsMounted();
-            scheduleControlPositionUpdate();
-            if (autoReadEnabled) scheduleAutoCheck();
-        });
-        observer.observe(document.body || document.documentElement, {
-            childList: true,
-            subtree: true,
-            characterData: true,
-        });
-    }
-
-    function observeRouteChanges() {
-        window.setInterval(() => {
-            if (window.location.href === lastLocationHref) return;
-            lastLocationHref = window.location.href;
-            processedTurns.clear();
-            pendingTurnIds.clear();
-            seenAssistantTurnIds.clear();
-            seedProcessedTurns();
-            seedSeenAssistantTurnIds();
-            closeOpenMenus();
-            scheduleControlPositionUpdate();
-            if (autoReadEnabled) scheduleAutoCheck();
-        }, 1000);
-    }
-
-    function bindLayoutListeners() {
-        window.addEventListener('resize', scheduleControlPositionUpdate, { passive: true });
-        window.addEventListener('orientationchange', scheduleControlPositionUpdate, { passive: true });
-    }
-
-    function scheduleControlPositionUpdate() {
-        window.clearTimeout(controlPositionTimer);
-        controlPositionTimer = window.setTimeout(updateControlPosition, 120);
-    }
-
-    function updateControlPosition() {
+    function updateTogglePosition() {
         const root = document.getElementById(ROOT_ID);
         if (!root) return;
 
         const rect = root.getBoundingClientRect();
-        const panelWidth = rect.width || 104;
-        const panelHeight = rect.height || 34;
+        const width = rect.width || 34;
+        const height = rect.height || 34;
         let left;
         let top;
 
-        if (isStoredPosition(controlPosition)) {
-            left = clamp(controlPosition.left, 8, Math.max(8, window.innerWidth - panelWidth - 8));
-            top = clamp(controlPosition.top, 8, Math.max(8, window.innerHeight - panelHeight - 8));
-            if (left !== controlPosition.left || top !== controlPosition.top) {
-                controlPosition = { left, top };
-                writeStoredJson(STORAGE_CONTROL_POSITION, controlPosition);
-            }
+        if (settings.position) {
+            left = settings.position.left;
+            top = settings.position.top;
         } else {
             const main = document.querySelector('main');
             const mainRect = main ? main.getBoundingClientRect() : null;
-            const desiredLeft = mainRect ? mainRect.left + 12 : 64;
-            left = clamp(desiredLeft, 8, Math.max(8, window.innerWidth - panelWidth - 8));
-            top = clamp(64, 8, Math.max(8, window.innerHeight - panelHeight - 8));
+            left = mainRect ? mainRect.left + 12 : 64;
+            top = 64;
         }
 
-        applyControlPosition(left, top);
+        left = clamp(left, 8, Math.max(8, window.innerWidth - width - 8));
+        top = clamp(top, 8, Math.max(8, window.innerHeight - height - 8));
+        root.style.setProperty('--cgpt-ara-left', Math.round(left) + 'px');
+        root.style.setProperty('--cgpt-ara-top', Math.round(top) + 'px');
+
+        if (settings.position && (left !== settings.position.left || top !== settings.position.top)) {
+            settings.position = { left: Math.round(left), top: Math.round(top) };
+            gmWrite(STORAGE.position, settings.position);
+        }
     }
 
-    function applyControlPosition(left, top) {
-        const root = document.getElementById(ROOT_ID);
-        if (!root) return;
-
-        const leftPx = Math.round(left) + 'px';
-        const topPx = Math.round(top) + 'px';
-        root.style.setProperty('--cgpt-ra-left', leftPx);
-        root.style.setProperty('--cgpt-ra-top', topPx);
-        document.documentElement.style.setProperty('--cgpt-ra-left', leftPx);
-        document.documentElement.style.setProperty('--cgpt-ra-top', topPx);
-    }
-
-    function isStoredPosition(position) {
-        return position
-            && Number.isFinite(position.left)
-            && Number.isFinite(position.top);
-    }
-
-    function bindControlDrag(root) {
-        root.addEventListener('pointerdown', handleControlPointerDown);
-        root.addEventListener('click', (event) => {
-            if (!suppressNextClick) return;
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            suppressNextClick = false;
-        }, true);
-    }
-
-    function handleControlPointerDown(event) {
+    function handlePointerDown(event) {
         if (event.button !== 0 || !event.isPrimary) return;
-
         const root = document.getElementById(ROOT_ID);
         if (!root) return;
 
@@ -481,22 +603,19 @@
             captured: false,
         };
 
-        root.addEventListener('pointermove', handleControlPointerMove);
-        root.addEventListener('pointerup', handleControlPointerEnd);
-        root.addEventListener('pointercancel', handleControlPointerEnd);
-        window.addEventListener('pointermove', handleControlPointerMove);
-        window.addEventListener('pointerup', handleControlPointerEnd);
-        window.addEventListener('pointercancel', handleControlPointerEnd);
+        window.addEventListener('pointermove', handlePointerMove);
+        window.addEventListener('pointerup', handlePointerEnd);
+        window.addEventListener('pointercancel', handlePointerEnd);
     }
 
-    function handleControlPointerMove(event) {
+    function handlePointerMove(event) {
         if (!dragState || event.pointerId !== dragState.pointerId) return;
-
         const deltaX = event.clientX - dragState.startX;
         const deltaY = event.clientY - dragState.startY;
-        if (!dragState.moved && Math.hypot(deltaX, deltaY) < DRAG_THRESHOLD_PX) return;
 
+        if (!dragState.moved && Math.hypot(deltaX, deltaY) < DRAG_THRESHOLD_PX) return;
         dragState.moved = true;
+
         const root = document.getElementById(ROOT_ID);
         if (!root) return;
 
@@ -504,48 +623,55 @@
             try {
                 root.setPointerCapture(event.pointerId);
                 dragState.captured = true;
-            } catch (error) {
-                // Pointer capture is best-effort; window listeners keep drag usable.
+            } catch (_error) {
+                // Window listeners keep dragging usable when capture is unavailable.
             }
         }
 
         const rect = root.getBoundingClientRect();
-        const left = clamp(dragState.startLeft + deltaX, 8, Math.max(8, window.innerWidth - rect.width - 8));
-        const top = clamp(dragState.startTop + deltaY, 8, Math.max(8, window.innerHeight - rect.height - 8));
+        const left = clamp(
+            dragState.startLeft + deltaX,
+            8,
+            Math.max(8, window.innerWidth - rect.width - 8),
+        );
+        const top = clamp(
+            dragState.startTop + deltaY,
+            8,
+            Math.max(8, window.innerHeight - rect.height - 8),
+        );
+
         root.classList.add('is-dragging');
-        applyControlPosition(left, top);
+        root.style.setProperty('--cgpt-ara-left', Math.round(left) + 'px');
+        root.style.setProperty('--cgpt-ara-top', Math.round(top) + 'px');
         event.preventDefault();
     }
 
-    function handleControlPointerEnd(event) {
+    function handlePointerEnd(event) {
         if (!dragState || event.pointerId !== dragState.pointerId) return;
-
+        const finishedDrag = dragState;
         const root = document.getElementById(ROOT_ID);
-        window.removeEventListener('pointermove', handleControlPointerMove);
-        window.removeEventListener('pointerup', handleControlPointerEnd);
-        window.removeEventListener('pointercancel', handleControlPointerEnd);
+
+        window.removeEventListener('pointermove', handlePointerMove);
+        window.removeEventListener('pointerup', handlePointerEnd);
+        window.removeEventListener('pointercancel', handlePointerEnd);
 
         if (root) {
-            root.removeEventListener('pointermove', handleControlPointerMove);
-            root.removeEventListener('pointerup', handleControlPointerEnd);
-            root.removeEventListener('pointercancel', handleControlPointerEnd);
             root.classList.remove('is-dragging');
-
-            if (dragState.captured) {
+            if (finishedDrag.captured) {
                 try {
                     root.releasePointerCapture(event.pointerId);
-                } catch (error) {
+                } catch (_error) {
                     // Matching release is best-effort.
                 }
             }
 
-            if (dragState.moved) {
+            if (finishedDrag.moved) {
                 const rect = root.getBoundingClientRect();
-                controlPosition = {
+                settings.position = {
                     left: Math.round(rect.left),
                     top: Math.round(rect.top),
                 };
-                writeStoredJson(STORAGE_CONTROL_POSITION, controlPosition);
+                gmWrite(STORAGE.position, settings.position);
                 suppressNextClick = true;
                 window.setTimeout(() => {
                     suppressNextClick = false;
@@ -556,454 +682,342 @@
         dragState = null;
     }
 
+    function suppressDraggedClick(event) {
+        if (!suppressNextClick) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        suppressNextClick = false;
+    }
+
     function consumeSuppressedClick() {
         if (!suppressNextClick) return false;
         suppressNextClick = false;
         return true;
     }
 
-    function ensureControlsMounted() {
-        if (!document.getElementById(ROOT_ID)) {
-            renderControls();
-        } else {
-            scheduleControlPositionUpdate();
-        }
+    function bindGlobalEvents() {
+        document.addEventListener('submit', handleComposerSubmit, true);
+        document.addEventListener('click', handleSendButtonClick, true);
+        window.addEventListener('keydown', handleBareArrowSeek, true);
+        window.addEventListener('resize', updateTogglePosition, { passive: true });
     }
 
-    function scheduleAutoCheck() {
-        window.clearTimeout(autoCheckTimer);
-        autoCheckTimer = window.setTimeout(() => {
-            void maybeAutoReadLatestTurn();
-        }, AUTO_DEBOUNCE_MS);
+    function handleComposerSubmit(event) {
+        const form = event.target instanceof HTMLFormElement ? event.target : null;
+        if (!form || !form.querySelector(SELECTORS.composer)) return;
+        armTask('composer-submit');
     }
 
-    async function maybeAutoReadLatestTurn() {
-        if (!autoReadEnabled || autoBusy || actionInFlight) return;
+    function handleSendButtonClick(event) {
+        const target = event.target instanceof Element ? event.target : null;
+        if (!target) return;
 
-        const turn = getLastAssistantTurn();
-        if (!turn) return;
-
-        const turnId = getTurnId(turn);
-        if (!turnId || pendingTurnIds.has(turnId)) return;
-        if (seenAssistantTurnIds.has(turnId)) return;
-
-        const currentKey = buildTurnKey(turn);
-        if (currentKey && processedTurns.has(currentKey)) return;
-
-        autoBusy = true;
-        pendingTurnIds.add(turnId);
-
-        try {
-            const ready = await waitForTurnReady(turn);
-            if (!ready || !autoReadEnabled || !document.contains(turn)) return;
-
-            const finalKey = buildTurnKey(turn);
-            if (!finalKey || processedTurns.has(finalKey)) return;
-
-            seenAssistantTurnIds.add(turnId);
-            processedTurns.add(finalKey);
-
-            try {
-                await triggerReadForTurn(turn, 'auto');
-            } catch (error) {
-                console.warn(SCRIPT_PREFIX, 'Auto read failed:', error);
-            }
-        } finally {
-            seenAssistantTurnIds.add(turnId);
-            pendingTurnIds.delete(turnId);
-            autoBusy = false;
-        }
-    }
-
-    async function waitForTurnReady(turn) {
-        const start = Date.now();
-        let stableCount = 0;
-        let lastText = '';
-
-        while (Date.now() - start < AUTO_READY_TIMEOUT_MS) {
-            if (!document.contains(turn)) return false;
-
-            const text = getTurnText(turn);
-            const hasMoreActions = Boolean(findMoreActionsButton(turn));
-            const isGenerating = isGeneratingVisible();
-
-            if (text && hasMoreActions && !isGenerating && text === lastText) {
-                stableCount += 1;
-            } else {
-                stableCount = 0;
-                lastText = text;
-            }
-
-            if (stableCount >= AUTO_STABLE_SAMPLE_COUNT) {
-                return true;
-            }
-
-            await delay(AUTO_SAMPLE_INTERVAL_MS);
+        const button = target.closest(SELECTORS.sendButton);
+        if (button) {
+            const form = button.closest('form');
+            if (form && form.querySelector(SELECTORS.composer)) armTask('send-button');
+            return;
         }
 
-        return false;
-    }
-
-    function findMoreActionsButton(turn) {
-        const buttons = Array.from(turn.querySelectorAll('button[aria-label]'));
-        const exact = buttons.find((button) => {
-            const label = normalizeText(button.getAttribute('aria-label') || '');
-            return MORE_ACTIONS_LABEL_RE.test(label) && hasElementBox(button);
-        });
-        if (exact) return exact;
-
-        return buttons.find((button) => {
-            const label = normalizeText(button.getAttribute('aria-label') || '');
-            return MORE_ACTIONS_FALLBACK_RE.test(label) && hasElementBox(button);
-        }) || null;
-    }
-
-    function findReadAloudMenuItem() {
-        const candidates = collectReadAloudCandidates();
-        const exact = candidates.find((item) => {
-            const label = getElementLabel(item);
-            return READ_ALOUD_LABEL_RE.test(label) && hasElementBox(item);
-        });
-        if (exact) return exact;
-
-        const labelMatch = candidates.find((item) => {
-            const label = getElementLabel(item);
-            return /(朗读|read aloud)/i.test(label) && hasElementBox(item);
-        });
-        if (labelMatch) return labelMatch;
-
-        return candidates.find((item) => {
-            return hasElementBox(item)
-                && (item.getAttribute('data-testid') === VOICE_PLAY_TESTID
-                    || item.querySelector('[data-testid="' + VOICE_PLAY_TESTID + '"]'));
-        }) || null;
-    }
-
-    function collectReadAloudCandidates() {
-        const elements = [];
-        const scopes = getOpenMenuScopes();
-
-        if (scopes.length) {
-            for (const scope of scopes) {
-                for (const testIdItem of scope.querySelectorAll('[data-testid="' + VOICE_PLAY_TESTID + '"]')) {
-                    elements.push(getActionableMenuItem(testIdItem));
-                }
-
-                elements.push(...Array.from(scope.querySelectorAll('[role="menuitem"], button, [role="button"]')));
-            }
-        } else {
-            for (const testIdItem of document.querySelectorAll('[data-testid="' + VOICE_PLAY_TESTID + '"]')) {
-                elements.push(getActionableMenuItem(testIdItem));
-            }
-        }
-
-        return dedupeElements(elements.filter((element) => element && !isInsideOwnControls(element)));
-    }
-
-    function getOpenMenuScopes() {
-        return Array.from(document.querySelectorAll('[role="menu"], [data-radix-menu-content]'))
-            .filter((element) => hasElementBox(element) && !isInsideOwnControls(element));
-    }
-
-    function isInsideOwnControls(element) {
-        const root = document.getElementById(ROOT_ID);
-        return Boolean(root && element && root.contains(element));
-    }
-
-    function getActionableMenuItem(element) {
-        if (!element) return null;
-        const menuItem = element.closest('[role="menuitem"]');
-        if (menuItem && hasElementBox(menuItem)) return menuItem;
-        return element;
-    }
-
-    function dedupeElements(elements) {
-        const seen = new Set();
-        const result = [];
-
-        for (const element of elements) {
-            if (!element || seen.has(element)) continue;
-            seen.add(element);
-            result.push(element);
-        }
-
-        return result;
-    }
-
-    function getElementLabel(element) {
-        return normalizeText([
-            element && element.innerText,
-            element && element.textContent,
-            element && element.getAttribute && element.getAttribute('aria-label'),
+        const generationAction = target.closest('button, [role="button"]');
+        const actionLabel = generationAction && normalizeText([
+            generationAction.getAttribute('aria-label'),
+            generationAction.getAttribute('title'),
+            generationAction.textContent,
         ].filter(Boolean).join(' '));
+        if (generationAction && GENERATION_ACTION_RE.test(actionLabel)) {
+            armTask('generation-action');
+        }
     }
 
-    function isGeneratingVisible() {
-        const buttons = Array.from(document.querySelectorAll('button[aria-label]'));
-        return buttons.some((button) => {
-            const label = normalizeText(button.getAttribute('aria-label') || '');
-            return STOP_GENERATING_LABEL_RE.test(label) && isVisibleInViewport(button);
+    function startObserver() {
+        observer = new MutationObserver(() => {
+            ensureToggleMounted();
+            scheduleEvaluation();
+        });
+        observer.observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+            characterData: true,
         });
     }
 
-    function closeOpenMenus() {
-        const ownerWindow = document.defaultView || window;
-        const init = {
-            key: 'Escape',
-            code: 'Escape',
-            bubbles: true,
-            cancelable: true,
-            composed: true,
-            view: ownerWindow,
-        };
-        const targets = [document.activeElement, document, ownerWindow].filter(Boolean);
-
-        for (const target of targets) {
-            try {
-                target.dispatchEvent(new ownerWindow.KeyboardEvent('keydown', init));
-                target.dispatchEvent(new ownerWindow.KeyboardEvent('keyup', init));
-            } catch (error) {
-                console.warn(SCRIPT_PREFIX, 'Failed to close menu target:', error);
-            }
-        }
+    function scheduleEvaluation(delayMs) {
+        if (checkTimer) return;
+        checkTimer = window.setTimeout(() => {
+            checkTimer = 0;
+            evaluatePageState();
+        }, delayMs ?? CHECK_DEBOUNCE_MS);
     }
 
-    async function clickReadAloudMenuItem(readItem, audioBaseline) {
-        if (!readItem) return false;
+    function evaluatePageState() {
+        const generationActive = isGenerationActive();
 
-        try {
-            readItem.focus({ preventScroll: true });
-        } catch (error) {
-            // Radix menu items are sometimes divs and may not be focusable.
+        if (generationActive && !generationWasActive && settings.autoRead) {
+            if (pendingTask) {
+                pendingTask.generationSeen = true;
+            } else {
+                armTask('generation-start');
+                if (pendingTask) pendingTask.generationSeen = true;
+            }
         }
 
-        if (typeof readItem.click === 'function') {
-            readItem.click();
+        generationWasActive = generationActive;
+        if (pendingTask) checkPendingTask(generationActive);
+    }
+
+    function armTask(source) {
+        if (!settings.autoRead) return;
+
+        const now = Date.now();
+        if (pendingTask && now - pendingTask.createdAt < 800 && !pendingTask.clicked) {
+            return;
+        }
+
+        if (pendingTask) cancelPendingTask('superseded');
+
+        pendingTask = {
+            id: ++taskSequence,
+            source,
+            createdAt: now,
+            expiresAt: now + TASK_TIMEOUT_MS,
+            conversationId: getConversationId(),
+            generationSeen: isGenerationActive(),
+            baseline: snapshotAssistantTurns(),
+            lastText: '',
+            stableSince: 0,
+            controlDeadline: 0,
+            clicked: false,
+            cancelled: false,
+        };
+
+        visualState = 'waiting';
+        updateToggleState();
+        scheduleEvaluation(0);
+        log('Armed for a new response.', { taskId: pendingTask.id, source });
+    }
+
+    function cancelPendingTask(reason) {
+        if (!pendingTask) return;
+        const cancelled = pendingTask;
+        cancelled.cancelled = true;
+        pendingTask = null;
+        visualState = 'idle';
+        updateToggleState();
+        log('Pending response cancelled.', { taskId: cancelled.id, reason });
+    }
+
+    function checkPendingTask(generationActive) {
+        const task = pendingTask;
+        if (!task || task.cancelled || task.clicked) return;
+
+        const now = Date.now();
+        if (!settings.autoRead) {
+            cancelPendingTask('disabled');
+            return;
+        }
+
+        const currentConversationId = getConversationId();
+        if (task.conversationId && currentConversationId !== task.conversationId) {
+            cancelPendingTask('conversation-navigation');
+            return;
+        }
+        if (!task.conversationId && currentConversationId) {
+            task.conversationId = currentConversationId;
+        }
+
+        if (now >= task.expiresAt) {
+            failPendingTask(task, 'Timed out waiting for the new response.');
+            return;
+        }
+
+        const target = findTargetTurn(task);
+        if (!target) {
+            if (!generationActive && !task.generationSeen && now - task.createdAt >= INTENT_TIMEOUT_MS) {
+                cancelPendingTask('no-generation-started');
+                return;
+            }
+            scheduleEvaluation(300);
+            return;
+        }
+
+        const text = getTurnText(target);
+        if (!text) {
+            scheduleEvaluation(250);
+            return;
+        }
+
+        if (generationActive) {
+            task.generationSeen = true;
+            task.lastText = text;
+            task.stableSince = 0;
+            task.controlDeadline = 0;
+            scheduleEvaluation(300);
+            return;
+        }
+
+        if (text !== task.lastText) {
+            task.lastText = text;
+            task.stableSince = now;
+            task.controlDeadline = 0;
+            scheduleEvaluation(TEXT_STABLE_MS);
+            return;
+        }
+
+        if (!task.stableSince) {
+            task.stableSince = now;
+            scheduleEvaluation(TEXT_STABLE_MS);
+            return;
+        }
+
+        const remainingStableTime = TEXT_STABLE_MS - (now - task.stableSince);
+        if (remainingStableTime > 0) {
+            scheduleEvaluation(Math.min(remainingStableTime, 300));
+            return;
+        }
+
+        const control = findReadControl(target);
+        if (!control) {
+            if (!task.controlDeadline) task.controlDeadline = now + CONTROL_WAIT_MS;
+            if (now >= task.controlDeadline) {
+                failPendingTask(task, 'No scoped Read Aloud control was found for the new response.');
+                return;
+            }
+            scheduleEvaluation(250);
+            return;
+        }
+
+        task.clicked = true;
+        void triggerReadOnce(task, target, control);
+    }
+
+    function failPendingTask(task, message) {
+        if (!pendingTask || pendingTask.id !== task.id) return;
+        task.cancelled = true;
+        pendingTask = null;
+        showErrorState(message);
+    }
+
+    async function triggerReadOnce(task, target, control) {
+        if (!pendingTask || pendingTask.id !== task.id || task.cancelled || !settings.autoRead) return;
+
+        const baseline = capturePlaybackBaseline();
+        try {
+            control.click();
+        } catch (error) {
+            failPendingTask(task, 'The scoped Read Aloud control could not be clicked.');
+            warn('Read Aloud click failed.', { error: String(error) });
+            return;
+        }
+
+        const playbackConfirmed = await waitForPlaybackSignal(target, baseline, task);
+        if (!pendingTask || pendingTask.id !== task.id || task.cancelled) return;
+
+        pendingTask = null;
+        visualState = 'idle';
+        updateToggleState();
+
+        if (playbackConfirmed) {
+            log('Native Read Aloud started.', { taskId: task.id });
         } else {
-            dispatchHumanLikeClick(readItem);
-        }
-
-        let audioDetected = await waitForAudioSignal(READ_ITEM_NATIVE_CONFIRM_MS, audioBaseline);
-        if (audioDetected || isReadAloudMenuItemInStopState(readItem)) {
-            return audioDetected;
-        }
-
-        dispatchHumanLikeClick(readItem);
-        audioDetected = await waitForAudioSignal(READ_ITEM_NATIVE_CONFIRM_MS, audioBaseline);
-        return audioDetected;
-    }
-
-    async function closeMenuAfterRead(moreButton, readItem) {
-        await delay(MENU_CLOSE_DELAY_MS);
-        closeOpenMenus();
-        releaseSyntheticHover(readItem);
-        releaseSyntheticHover(moreButton);
-        blurActiveMenuElement();
-        await delay(80);
-        closeOpenMenus();
-    }
-
-    function releaseSyntheticHover(element) {
-        if (!element) return;
-
-        const ownerWindow = element.ownerDocument && element.ownerDocument.defaultView || window;
-        const rect = element.getBoundingClientRect();
-        const clientX = rect.left + Math.max(1, rect.width / 2);
-        const clientY = rect.top + Math.max(1, rect.height / 2);
-        const relatedTarget = document.body || document.documentElement;
-        const events = [
-            ['pointerout', 0],
-            ['pointerleave', 0],
-            ['mouseout', 0],
-            ['mouseleave', 0],
-        ];
-
-        for (const [type, buttons] of events) {
-            try {
-                const event = createPointerOrMouseEvent(element, type, clientX, clientY, buttons, relatedTarget);
-                element.dispatchEvent(event);
-            } catch (error) {
-                console.warn(SCRIPT_PREFIX, 'Synthetic ' + type + ' event failed:', error);
-            }
-        }
-
-        try {
-            const moveTarget = document.body || document.documentElement;
-            moveTarget.dispatchEvent(new ownerWindow.MouseEvent('mousemove', {
-                bubbles: true,
-                cancelable: true,
-                composed: true,
-                view: ownerWindow,
-                clientX: 4,
-                clientY: 4,
-            }));
-        } catch (error) {
-            console.warn(SCRIPT_PREFIX, 'Failed to release synthetic hover:', error);
+            showErrorState('Read Aloud was clicked once, but playback could not be confirmed.');
         }
     }
 
-    function blurActiveMenuElement() {
-        const activeElement = document.activeElement;
-        if (activeElement && typeof activeElement.blur === 'function') {
-            try {
-                activeElement.blur();
-            } catch (error) {
-                // Ignore focus cleanup failures.
-            }
-        }
-
-        const root = document.getElementById(ROOT_ID);
-        if (root && typeof root.focus === 'function') {
-            try {
-                root.focus({ preventScroll: true });
-                root.blur();
-            } catch (error) {
-                // Ignore focus cleanup failures.
-            }
-        }
-    }
-
-    function dispatchHumanLikeClick(element) {
-        if (!element) return;
-
-        try {
-            element.focus({ preventScroll: true });
-        } catch (error) {
-            // Some menuitem divs are not focusable in all states.
-        }
-
-        const rect = element.getBoundingClientRect();
-        const clientX = rect.left + Math.max(1, rect.width / 2);
-        const clientY = rect.top + Math.max(1, rect.height / 2);
-
-        const events = [
-            ['pointerover', 0],
-            ['pointerenter', 0],
-            ['mouseover', 0],
-            ['mouseenter', 0],
-            ['pointermove', 0],
-            ['mousemove', 0],
-            ['pointerdown', 1],
-            ['mousedown', 1],
-            ['pointerup', 0],
-            ['mouseup', 0],
-            ['click', 0],
-        ];
-
-        let clickDispatched = false;
-        for (const [type, buttons] of events) {
-            try {
-                const event = createPointerOrMouseEvent(element, type, clientX, clientY, buttons);
-                element.dispatchEvent(event);
-                if (type === 'click') clickDispatched = true;
-            } catch (error) {
-                console.warn(SCRIPT_PREFIX, 'Synthetic ' + type + ' event failed:', error);
-                if (type === 'click') clickDispatched = false;
-            }
-        }
-
-        if (!clickDispatched && typeof element.click === 'function') {
-            element.click();
-        }
-    }
-
-    function createPointerOrMouseEvent(element, type, clientX, clientY, buttons, relatedTarget) {
-        const ownerWindow = element && element.ownerDocument && element.ownerDocument.defaultView || window;
-        const init = {
-            bubbles: true,
-            cancelable: true,
-            composed: true,
-            view: ownerWindow,
-            clientX,
-            clientY,
-            button: 0,
-            buttons,
-            relatedTarget: relatedTarget || null,
-        };
-
-        if (type.startsWith('pointer') && typeof ownerWindow.PointerEvent === 'function') {
-            try {
-                return new ownerWindow.PointerEvent(type, Object.assign({}, init, {
-                    pointerId: 1,
-                    pointerType: 'mouse',
-                    isPrimary: true,
-                }));
-            } catch (error) {
-                const mouseType = type.replace(/^pointer/, 'mouse');
-                return new ownerWindow.MouseEvent(mouseType, init);
-            }
-        }
-
-        return new ownerWindow.MouseEvent(type.replace(/^pointer/, 'mouse'), init);
-    }
-
-    async function waitForElement(getter, timeoutMs) {
-        const start = Date.now();
-        while (Date.now() - start < timeoutMs) {
-            const element = getter();
-            if (element) return element;
-            await delay(80);
-        }
-        return null;
-    }
-
-    function captureAudioBaseline() {
-        return Array.from(document.querySelectorAll('audio')).map((audio, index) => ({
-            audio,
-            index,
-            src: audio.currentSrc || audio.src || '',
-            currentTime: Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
-            paused: audio.paused,
-            duration: Number.isFinite(audio.duration) ? audio.duration : null,
+    function snapshotAssistantTurns() {
+        return getAssistantTurns().map((turn) => ({
+            element: turn,
+            stableId: getTurnStableId(turn),
+            textHash: hashText(getTurnText(turn)),
         }));
     }
 
-    async function waitForAudioSignal(timeoutMs, baseline) {
-        const start = Date.now();
-        while (Date.now() - start < timeoutMs) {
-            const audios = Array.from(document.querySelectorAll('audio'));
-            if (audios.some((audio, index) => hasNewAudioSignal(audio, index, baseline))) {
-                return true;
-            }
-            await delay(120);
+    function findTargetTurn(task) {
+        const candidates = [];
+        for (const turn of getAssistantTurns()) {
+            const text = getTurnText(turn);
+            if (!text) continue;
+
+            const stableId = getTurnStableId(turn);
+            const baseline = task.baseline.find((entry) => {
+                if (entry.element === turn) return true;
+                return stableId && entry.stableId && stableId === entry.stableId;
+            });
+
+            if (!baseline || baseline.textHash !== hashText(text)) candidates.push(turn);
         }
-        return false;
+
+        return candidates.length ? candidates[candidates.length - 1] : null;
     }
 
-    function hasNewAudioSignal(audio, index, baseline) {
-        const src = audio.currentSrc || audio.src || '';
-        const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-        const previous = findAudioBaseline(audio, index, baseline);
-        const previousTime = previous ? previous.currentTime : 0;
-        const previousSrc = previous ? previous.src : '';
-        const isNewBlob = CHATGPT_BLOB_AUDIO_RE.test(src) && src !== previousSrc;
-        const progressed = currentTime > previousTime + 0.05;
-        const becameActive = previous ? previous.paused && !audio.paused : !audio.paused;
+    function getAssistantTurns() {
+        const turns = [];
+        const seen = new Set();
 
-        return isNewBlob || progressed || becameActive;
+        for (const message of document.querySelectorAll(SELECTORS.assistant)) {
+            const turn = message.closest('article')
+                || message.closest('[data-testid^="conversation-turn"]')
+                || message.parentElement;
+            if (turn && !seen.has(turn)) {
+                seen.add(turn);
+                turns.push(turn);
+            }
+        }
+
+        return turns;
     }
 
-    function findAudioBaseline(audio, index, baseline) {
-        if (!Array.isArray(baseline)) return null;
-        return baseline.find((item) => item.audio === audio) || baseline.find((item) => item.index === index) || null;
+    function getTurnStableId(turn) {
+        const message = turn.querySelector(SELECTORS.assistant);
+        return normalizeText(
+            (message && (message.getAttribute('data-message-id') || message.id))
+            || turn.getAttribute('data-message-id')
+            || turn.getAttribute('data-testid')
+            || turn.id
+            || '',
+        );
     }
 
-    function isReadAloudMenuItemInStopState(readItem) {
-        if (!readItem) return false;
-        const label = getElementLabel(readItem);
-        return /^(停止|Stop)$/i.test(label) || /(停止朗读|Stop read aloud|Stop reading)/i.test(label);
+    function getTurnText(turn) {
+        const message = turn && turn.querySelector(SELECTORS.assistant);
+        return normalizeText(message ? (message.innerText || message.textContent || '') : '');
     }
 
-    function delay(ms) {
-        return new Promise((resolve) => window.setTimeout(resolve, ms));
+    function getConversationId() {
+        const match = window.location.pathname.match(/\/c\/([^/?]+)/);
+        return match ? match[1] : '';
     }
 
-    function clamp(value, min, max) {
-        return Math.min(Math.max(value, min), max);
+    function findReadControl(turn) {
+        const extensionControl = turn.querySelector(SELECTORS.extensionRead);
+        if (isActionable(extensionControl)) return extensionControl;
+
+        const directNative = turn.querySelector(SELECTORS.nativeRead);
+        if (isActionable(directNative)) return directNative;
+
+        const labelledControls = Array.from(turn.querySelectorAll('button[aria-label], [role="button"][aria-label]'));
+        return labelledControls.find((element) => {
+            const label = normalizeText(element.getAttribute('aria-label') || '');
+            return READ_ALOUD_RE.test(label) && isActionable(element);
+        }) || null;
     }
 
-    function hasElementBox(element) {
-        if (!element) return false;
+    function isGenerationActive() {
+        const direct = document.querySelector('[data-testid="stop-button"], button[data-testid="stop-button"]');
+        if (isActionable(direct)) return true;
+
+        return Array.from(document.querySelectorAll('button[aria-label]')).some((button) => {
+            const label = normalizeText(button.getAttribute('aria-label') || '');
+            return STOP_GENERATING_RE.test(label) && isActionable(button);
+        });
+    }
+
+    function isActionable(element) {
+        return Boolean(element && !element.disabled && isVisible(element));
+    }
+
+    function isVisible(element) {
+        if (!(element instanceof Element)) return false;
         const rect = element.getBoundingClientRect();
         const style = window.getComputedStyle(element);
         return rect.width > 0
@@ -1012,183 +1026,102 @@
             && style.visibility !== 'hidden';
     }
 
-    function isVisibleInViewport(element) {
-        if (!hasElementBox(element)) return false;
-        const rect = element.getBoundingClientRect();
-        return rect.bottom > 0
-            && rect.right > 0
-            && rect.top < window.innerHeight
-            && rect.left < window.innerWidth;
+    function capturePlaybackBaseline() {
+        return {
+            media: Array.from(document.querySelectorAll('audio, video')).map((media) => ({
+                element: media,
+                src: media.currentSrc || media.src || '',
+                paused: media.paused,
+            })),
+            seekEnabled: hasEnabledSeekControl(),
+        };
     }
 
-    function normalizeText(text) {
-        return String(text || '').replace(/\s+/g, ' ').trim();
+    async function waitForPlaybackSignal(target, baseline, task) {
+        const startedAt = Date.now();
+        while (Date.now() - startedAt < PLAYBACK_VERIFY_MS) {
+            if (task.cancelled) return false;
+
+            const activeInline = target.querySelector(SELECTORS.extensionRead + '.cgpt-active');
+            if (activeInline) return true;
+
+            if (!baseline.seekEnabled && hasEnabledSeekControl()) return true;
+            if (hasNewMediaSignal(baseline.media)) return true;
+            await delay(125);
+        }
+        return false;
     }
 
-    function hashText(text) {
+    function hasEnabledSeekControl() {
+        return [SELECTORS.seekBack, SELECTORS.seekForward].some((selector) => {
+            const button = document.querySelector(selector);
+            return isActionable(button);
+        });
+    }
+
+    function hasNewMediaSignal(baseline) {
+        for (const media of document.querySelectorAll('audio, video')) {
+            if (media.paused || media.ended) continue;
+            const previous = baseline.find((entry) => entry.element === media);
+            const src = media.currentSrc || media.src || '';
+            if (!previous || previous.paused || previous.src !== src) return true;
+        }
+        return false;
+    }
+
+    function handleBareArrowSeek(event) {
+        if (!settings.bareArrowSeek || event.repeat) return;
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+        if (isInteractiveEvent(event) || hasVisibleOverlay()) return;
+
+        const selector = event.key === 'ArrowLeft' ? SELECTORS.seekBack : SELECTORS.seekForward;
+        const seekButton = document.querySelector(selector);
+        if (!isActionable(seekButton)) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        seekButton.click();
+    }
+
+    function isInteractiveEvent(event) {
+        const path = typeof event.composedPath === 'function' ? event.composedPath() : [event.target];
+        const activeElement = document.activeElement;
+        if (activeElement instanceof Element && isInteractiveElement(activeElement)) return true;
+
+        return path.some((item) => item instanceof Element && isInteractiveElement(item));
+    }
+
+    function isInteractiveElement(element) {
+        return element.matches(INTERACTIVE_SELECTOR)
+            || element.isContentEditable
+            || Boolean(element.closest(INTERACTIVE_SELECTOR));
+    }
+
+    function hasVisibleOverlay() {
+        return Array.from(document.querySelectorAll('[role="dialog"], [role="menu"], [role="listbox"]'))
+            .some(isVisible);
+    }
+
+    function normalizeText(value) {
+        return String(value || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function hashText(value) {
+        const text = normalizeText(value);
         let hash = 0;
-        const source = normalizeText(text);
-        for (let i = 0; i < source.length; i += 1) {
-            hash = ((hash << 5) - hash + source.charCodeAt(i)) | 0;
+        for (let index = 0; index < text.length; index += 1) {
+            hash = ((hash << 5) - hash + text.charCodeAt(index)) | 0;
         }
-        return Math.abs(hash).toString(36);
+        return String(hash >>> 0);
     }
 
-    function injectStyles() {
-        if (document.getElementById(STYLE_ID)) return;
+    function clamp(value, min, max) {
+        return Math.min(Math.max(value, min), max);
+    }
 
-        const css = `
-            #${ROOT_ID} {
-                position: fixed;
-                left: var(--cgpt-ra-left, 272px);
-                top: var(--cgpt-ra-top, 64px);
-                z-index: 2147483647;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                color: #101828;
-                touch-action: none;
-                user-select: none;
-            }
-
-            #${ROOT_ID} .cgpt-ra-panel {
-                display: flex;
-                align-items: center;
-                gap: 4px;
-                width: 100px;
-                height: 34px;
-                padding: 3px 5px;
-                border: 1px solid rgba(20, 28, 44, 0.14);
-                border-radius: 999px;
-                background: rgba(255, 255, 255, 0.3);
-                box-shadow: 0 8px 20px rgba(20, 28, 44, 0.1);
-                backdrop-filter: blur(10px) saturate(125%);
-                -webkit-backdrop-filter: blur(10px) saturate(125%);
-                cursor: grab;
-                opacity: 0.48;
-                transition: opacity 0.16s ease, background 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
-            }
-
-            #${ROOT_ID} .cgpt-ra-panel:hover,
-            #${ROOT_ID} .cgpt-ra-panel:focus-within {
-                background: rgba(255, 255, 255, 0.62);
-                box-shadow: 0 10px 24px rgba(20, 28, 44, 0.16);
-                opacity: 0.9;
-            }
-
-            #${ROOT_ID}.is-dragging .cgpt-ra-panel {
-                cursor: grabbing;
-                opacity: 0.96;
-                transform: scale(1.02);
-            }
-
-            #${ROOT_ID} .cgpt-ra-btn {
-                position: relative;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                width: 28px;
-                min-width: 28px;
-                height: 28px;
-                padding: 0;
-                border: 1px solid rgba(20, 28, 44, 0.14);
-                border-radius: 50%;
-                background: rgba(255, 255, 255, 0.38);
-                color: rgba(16, 24, 40, 0.72);
-                cursor: pointer;
-                user-select: none;
-                transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease, opacity 0.16s ease, transform 0.16s ease;
-            }
-
-            #${ROOT_ID} .cgpt-ra-btn:hover,
-            #${ROOT_ID} .cgpt-ra-btn:focus-visible {
-                background: rgba(255, 255, 255, 0.82);
-                border-color: rgba(20, 28, 44, 0.24);
-                color: #101828;
-                outline: none;
-                transform: translateY(-1px);
-            }
-
-            #${ROOT_ID} .cgpt-ra-btn:disabled {
-                cursor: wait;
-                opacity: 0.64;
-                transform: none;
-            }
-
-            #${ROOT_ID} .cgpt-ra-icon {
-                width: 15px;
-                height: 15px;
-                fill: none;
-                stroke: currentColor;
-                stroke-width: 1.9;
-                stroke-linecap: round;
-                stroke-linejoin: round;
-            }
-
-            #${ROOT_ID} [data-action="toggle-auto"] .cgpt-ra-icon {
-                stroke-width: 1.7;
-            }
-
-            #${ROOT_ID} .cgpt-ra-primary {
-                border-color: rgba(31, 122, 92, 0.28);
-                background: rgba(31, 122, 92, 0.12);
-                color: #17694f;
-            }
-
-            #${ROOT_ID} .cgpt-ra-primary:hover {
-                background: rgba(31, 122, 92, 0.22);
-            }
-
-            #${ROOT_ID} .cgpt-ra-btn.is-busy {
-                color: #667085;
-            }
-
-            #${ROOT_ID} .cgpt-ra-toggle.is-on {
-                border-color: rgba(36, 99, 235, 0.34);
-                background: rgba(36, 99, 235, 0.16);
-                color: #1d4ed8;
-            }
-
-            #${ROOT_ID} .cgpt-ra-btn::after {
-                position: absolute;
-                left: 50%;
-                top: calc(100% + 8px);
-                width: max-content;
-                max-width: 190px;
-                padding: 5px 7px;
-                border-radius: 6px;
-                background: rgba(16, 24, 40, 0.84);
-                color: #fff;
-                content: attr(data-tooltip);
-                font-size: 11px;
-                line-height: 1.3;
-                opacity: 0;
-                pointer-events: none;
-                transform: translate(-50%, -3px);
-                transition: opacity 0.14s ease, transform 0.14s ease;
-                white-space: nowrap;
-            }
-
-            #${ROOT_ID} .cgpt-ra-btn:hover::after,
-            #${ROOT_ID} .cgpt-ra-btn:focus-visible::after {
-                opacity: 1;
-                transform: translate(-50%, 0);
-            }
-
-            @media (max-width: 720px) {
-                #${ROOT_ID} .cgpt-ra-panel {
-                    width: 96px;
-                    height: 33px;
-                }
-            }
-        `;
-
-        if (typeof GM_addStyle === 'function') {
-            GM_addStyle(css);
-            return;
-        }
-
-        const style = document.createElement('style');
-        style.id = STYLE_ID;
-        style.textContent = css;
-        (document.head || document.documentElement).appendChild(style);
+    function delay(ms) {
+        return new Promise((resolve) => window.setTimeout(resolve, ms));
     }
 })();
