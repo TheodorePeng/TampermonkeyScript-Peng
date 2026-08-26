@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Auto Read Aloud
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0
+// @version      1.0.1
 // @description  Automatically start native ChatGPT Read Aloud for newly completed replies through ChatGPT Audio Controls.
 // @author       TheodorePeng
 // @match        https://chatgpt.com/*
@@ -21,12 +21,13 @@
     'use strict';
 
     const PREFIX = '[ChatGPTAutoReadAloud]';
-    const VERSION = '1.0.0';
+    const VERSION = '1.0.1';
 
     const STORAGE = Object.freeze({
         autoRead: 'chatgpt-auto-read-aloud:auto-read-enabled',
         hideExtensionToggle: 'chatgpt-auto-read-aloud:hide-extension-toggle',
         bareArrowSeek: 'chatgpt-auto-read-aloud:bare-arrow-seek-enabled',
+        bareArrowSafetyReset: 'chatgpt-auto-read-aloud:bare-arrow-safety-reset',
         position: 'chatgpt-auto-read-aloud:floating-position',
         migration: 'chatgpt-auto-read-aloud:migration-v1',
     });
@@ -99,6 +100,7 @@
 
     function init() {
         migrateSettings();
+        applyBareArrowSafetyReset();
         settings = readSettings();
         installStyles();
         applyExtensionToggleVisibility();
@@ -210,6 +212,12 @@
         gmWrite(STORAGE.migration, true);
     }
 
+    function applyBareArrowSafetyReset() {
+        if (readBoolean(STORAGE.bareArrowSafetyReset, false)) return;
+        gmWrite(STORAGE.bareArrowSeek, false);
+        gmWrite(STORAGE.bareArrowSafetyReset, true);
+    }
+
     function readSettings() {
         return {
             autoRead: readBoolean(STORAGE.autoRead, true),
@@ -287,7 +295,7 @@
             () => setHideExtensionToggle(!settings.hideExtensionToggle),
         ));
         menuIds.push(GM_registerMenuCommand(
-            '裸方向键 ±10 秒：' + (settings.bareArrowSeek ? '开（点击关闭）' : '关（点击开启）'),
+            '实验性裸方向键 ±10 秒：' + (settings.bareArrowSeek ? '开（点击关闭）' : '关（点击开启）'),
             () => setBareArrowSeekEnabled(!settings.bareArrowSeek),
         ));
         menuIds.push(GM_registerMenuCommand('重置自动朗读按钮位置', resetTogglePosition));
@@ -347,8 +355,8 @@
                 left: var(--cgpt-ara-left, 64px);
                 top: var(--cgpt-ara-top, 64px);
                 z-index: 2147483647;
-                width: 34px;
-                height: 34px;
+                width: 26px;
+                height: 26px;
                 color: rgba(16, 24, 40, 0.72);
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                 touch-action: none;
@@ -360,13 +368,13 @@
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
-                width: 34px;
-                height: 34px;
+                width: 26px;
+                height: 26px;
                 padding: 0;
                 border: 1px solid rgba(20, 28, 44, 0.16);
                 border-radius: 50%;
                 background: rgba(255, 255, 255, 0.34);
-                box-shadow: 0 8px 20px rgba(20, 28, 44, 0.1);
+                box-shadow: 0 5px 14px rgba(20, 28, 44, 0.1);
                 backdrop-filter: blur(10px) saturate(125%);
                 -webkit-backdrop-filter: blur(10px) saturate(125%);
                 color: inherit;
@@ -381,7 +389,7 @@
                 opacity: 0.94;
                 outline: none;
                 transform: translateY(-1px);
-                box-shadow: 0 10px 24px rgba(20, 28, 44, 0.16);
+                box-shadow: 0 7px 18px rgba(20, 28, 44, 0.16);
             }
 
             #${ROOT_ID}[data-state="on"] .cgpt-ara-toggle,
@@ -410,8 +418,8 @@
             }
 
             #${ROOT_ID} .cgpt-ara-icon {
-                width: 17px;
-                height: 17px;
+                width: 13px;
+                height: 13px;
                 fill: none;
                 stroke: currentColor;
                 stroke-width: 1.7;

@@ -94,7 +94,7 @@
 
 | 脚本 | 功能简介 | 适用站点 |
 |------|---------|---------|
-| **[ChatGPTAutoReadAloud.user.js](ChatGPTAutoReadAloud.user.js)** | 配合 ChatGPT Audio Controls 扩展，在新回答完成后自动触发原生 Read Aloud；提供可拖拽开关、扩展 Logo 隐藏设置和可选裸方向键 seek | `chatgpt.com/*` |
+| **[ChatGPTAutoReadAloud.user.js](ChatGPTAutoReadAloud.user.js)** | 配合 ChatGPT Audio Controls 扩展，在新回答完成后自动触发原生 Read Aloud；提供可拖拽开关、扩展 Logo 隐藏设置和实验性裸方向键 seek（受上游控件行为影响，可能无效，建议保持关闭） | `chatgpt.com/*` |
 | **[DoubaoTimelineMarkdownExporter.js](DoubaoTimelineMarkdownExporter.js)** | 在豆包 Bilibili 视频解读页右下角添加悬浮按钮，一键把豆包生成的高亮时间线提取为 Markdown bullets | `doubao.com/summary/bilibili/*` |
 
 ---

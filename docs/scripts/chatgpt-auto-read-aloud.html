@@ -44,7 +44,7 @@
 
 <table class="info-table">
   <tr><th>脚本名称</th><td>ChatGPT Auto Read Aloud</td></tr>
-  <tr><th>版本</th><td><code>1.0.0</code></td></tr>
+  <tr><th>版本</th><td><code>1.0.1</code></td></tr>
   <tr><th>作者</th><td>TheodorePeng</td></tr>
   <tr><th>适用站点</th><td><code>chatgpt.com/*</code></td></tr>
   <tr><th>依赖</th><td>推荐安装 <a href="https://github.com/infoxica/chatgpt-audio-controls" target="_blank">ChatGPT Audio Controls &amp; Read Aloud</a></td></tr>
@@ -67,7 +67,7 @@
   <li><strong>历史内容安全</strong>：初始化、刷新、滚动、侧栏切换和加载旧消息时不会朗读已有回答。</li>
   <li><strong>单一悬浮开关</strong>：页面只显示一枚半透明 Auto/Speaker 按钮；蓝色为开启，灰色为关闭，等待生成时显示轻微动态状态。</li>
   <li><strong>拖拽与位置记忆</strong>：按住按钮拖动即可调整位置，刷新和切换会话后继续使用上次位置。</li>
-  <li><strong>低频菜单设置</strong>：Tampermonkey 菜单可隐藏原扩展的空闲 Logo、启用裸左右方向键 seek，或重置悬浮按钮位置。</li>
+  <li><strong>低频菜单设置</strong>：Tampermonkey 菜单可隐藏原扩展的空闲 Logo、启用实验性裸左右方向键 seek，或重置悬浮按钮位置。</li>
   <li><strong>安全失败</strong>：找不到目标朗读按钮时只显示短暂错误状态并输出去敏日志，不会循环点击、打开回答菜单或重置页面音频。</li>
 </ul>
 
@@ -79,7 +79,7 @@
   <li>首次安装默认开启自动朗读；点击按钮可以快速开关，脚本会记住状态。</li>
   <li>正常发送消息。回答完成并出现该回答的朗读按钮后，脚本会点击一次并验证原生播放器已经启动。</li>
   <li>按住悬浮按钮拖动可以移动位置；鼠标悬浮或键盘 focus 时会显示当前状态。</li>
-  <li>打开 Tampermonkey 扩展菜单，可以显示或隐藏 Audio Controls 的空闲 Logo、启用裸左右方向键 seek，或重置按钮位置。</li>
+  <li>打开 Tampermonkey 扩展菜单，可以显示或隐藏 Audio Controls 的空闲 Logo、启用实验性裸左右方向键 seek，或重置按钮位置。</li>
 </ol>
 
 <h2 id="notes">注意事项</h2>
@@ -87,7 +87,7 @@
 <ul>
   <li>升级时会继承 v0.1.4 已保存的自动朗读状态和悬浮位置；没有旧状态时默认开启。</li>
   <li>隐藏扩展 Logo 只影响 <code>#cgpt-ra-floating-toggle</code>，不会隐藏回答朗读按钮或播放中的进度、暂停、倍速和音量控件。</li>
-  <li>裸左右方向键默认关闭。开启后也只在焦点不处于输入框、按钮、菜单等交互区域且扩展 seek 按钮可用时生效。</li>
+  <li>实验性裸左右方向键默认关闭。其实现依赖上游扩展的 seek 控件行为，当前可能无效，建议保持关闭；v1.0.1 首次运行时会将已有的开启状态一次性重置为关闭，之后仍允许用户手动重新开启。</li>
   <li>如果扩展未安装、Inline Speech Buttons 被关闭或 ChatGPT 页面结构改变，自动朗读会安全失败；脚本不会退回到容易干扰页面的菜单模拟方案。</li>
 </ul>
 
