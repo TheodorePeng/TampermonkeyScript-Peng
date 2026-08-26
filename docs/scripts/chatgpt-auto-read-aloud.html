@@ -44,7 +44,7 @@
 
 <table class="info-table">
   <tr><th>脚本名称</th><td>ChatGPT Auto Read Aloud</td></tr>
-  <tr><th>版本</th><td><code>1.0.1</code></td></tr>
+  <tr><th>版本</th><td><code>1.0.2</code></td></tr>
   <tr><th>作者</th><td>TheodorePeng</td></tr>
   <tr><th>适用站点</th><td><code>chatgpt.com/*</code></td></tr>
   <tr><th>依赖</th><td>推荐安装 <a href="https://github.com/infoxica/chatgpt-audio-controls" target="_blank">ChatGPT Audio Controls &amp; Read Aloud</a></td></tr>
@@ -63,7 +63,7 @@
 <ul>
   <li><strong>自动朗读新回答</strong>：默认开启；只处理脚本运行后由当前页面新发起的回答，每条最多触发一次。</li>
   <li><strong>原生播放</strong>：优先点击 Audio Controls 扩展为目标回答注入的 <code>.cgpt-inline-readaloud</code>，备用路径只使用回答内部直接可见的 ChatGPT 原生朗读按钮，不实现额外 TTS。</li>
-  <li><strong>新会话安全</strong>：等待任务会跨越新 Chat 的 URL 切换，不会在首次回答生成时重新登记或干预整个会话。</li>
+  <li><strong>新会话安全</strong>：等待任务会跨越新 Chat 从临时 <code>WEB:</code> 会话 ID 到正式会话 URL 的切换，不会误取消首轮自动朗读，也不会在首次回答生成时重新登记或干预整个会话。</li>
   <li><strong>历史内容安全</strong>：初始化、刷新、滚动、侧栏切换和加载旧消息时不会朗读已有回答。</li>
   <li><strong>单一悬浮开关</strong>：页面只显示一枚半透明 Auto/Speaker 按钮；蓝色为开启，灰色为关闭，等待生成时显示轻微动态状态。</li>
   <li><strong>拖拽与位置记忆</strong>：按住按钮拖动即可调整位置，刷新和切换会话后继续使用上次位置。</li>
@@ -86,6 +86,7 @@
 
 <ul>
   <li>升级时会继承 v0.1.4 已保存的自动朗读状态和悬浮位置；没有旧状态时默认开启。</li>
+  <li>v1.0.2 允许同一条新 Chat 回答将一次临时 <code>WEB:</code> 会话 ID 安全升级为正式 ID；其他会话 ID 变化仍会取消待处理任务，避免朗读切换后的历史回答。</li>
   <li>隐藏扩展 Logo 只影响 <code>#cgpt-ra-floating-toggle</code>，不会隐藏回答朗读按钮或播放中的进度、暂停、倍速和音量控件。</li>
   <li>实验性裸左右方向键默认关闭。其实现依赖上游扩展的 seek 控件行为，当前可能无效，建议保持关闭；v1.0.1 首次运行时会将已有的开启状态一次性重置为关闭，之后仍允许用户手动重新开启。</li>
   <li>如果扩展未安装、Inline Speech Buttons 被关闭或 ChatGPT 页面结构改变，自动朗读会安全失败；脚本不会退回到容易干扰页面的菜单模拟方案。</li>

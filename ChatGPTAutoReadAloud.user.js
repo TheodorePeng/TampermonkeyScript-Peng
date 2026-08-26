@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Auto Read Aloud
 // @namespace    http://tampermonkey.net/
-// @version      1.0.1
+// @version      1.0.2
 // @description  Automatically start native ChatGPT Read Aloud for newly completed replies through ChatGPT Audio Controls.
 // @author       TheodorePeng
 // @match        https://chatgpt.com/*
@@ -21,7 +21,7 @@
     'use strict';
 
     const PREFIX = '[ChatGPTAutoReadAloud]';
-    const VERSION = '1.0.1';
+    const VERSION = '1.0.2';
 
     const STORAGE = Object.freeze({
         autoRead: 'chatgpt-auto-read-aloud:auto-read-enabled',
@@ -815,6 +815,27 @@
         log('Pending response cancelled.', { taskId: cancelled.id, reason });
     }
 
+    function isProvisionalConversationId(conversationId) {
+        return /^WEB:/i.test(conversationId || '');
+    }
+
+    function canPromoteProvisionalConversation(task, currentConversationId, generationActive) {
+        if (!task.generationSeen
+            || !isProvisionalConversationId(task.conversationId)
+            || !currentConversationId
+            || isProvisionalConversationId(currentConversationId)) {
+            return false;
+        }
+
+        if (generationActive) return true;
+
+        const target = findTargetTurn(task);
+        const currentText = getTurnText(target);
+        return Boolean(task.lastText
+            && currentText
+            && (currentText.startsWith(task.lastText) || task.lastText.startsWith(currentText)));
+    }
+
     function checkPendingTask(generationActive) {
         const task = pendingTask;
         if (!task || task.cancelled || task.clicked) return;
@@ -827,8 +848,13 @@
 
         const currentConversationId = getConversationId();
         if (task.conversationId && currentConversationId !== task.conversationId) {
-            cancelPendingTask('conversation-navigation');
-            return;
+            if (canPromoteProvisionalConversation(task, currentConversationId, generationActive)) {
+                task.conversationId = currentConversationId;
+                log('Accepted final conversation route for pending response.', { taskId: task.id });
+            } else {
+                cancelPendingTask('conversation-navigation');
+                return;
+            }
         }
         if (!task.conversationId && currentConversationId) {
             task.conversationId = currentConversationId;
