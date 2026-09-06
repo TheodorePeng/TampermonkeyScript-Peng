@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT Auto Read Aloud
 // @namespace    http://tampermonkey.net/
-// @version      1.0.2
-// @description  Automatically start native ChatGPT Read Aloud for newly completed replies through ChatGPT Audio Controls.
+// @version      1.1.0
+// @description  Automatically enable Web Search in ordinary ChatGPT chats and start native Read Aloud for newly completed replies.
 // @author       TheodorePeng
 // @match        https://chatgpt.com/*
 // @run-at       document-idle
@@ -21,10 +21,11 @@
     'use strict';
 
     const PREFIX = '[ChatGPTAutoReadAloud]';
-    const VERSION = '1.0.2';
+    const VERSION = '1.1.0';
 
     const STORAGE = Object.freeze({
         autoRead: 'chatgpt-auto-read-aloud:auto-read-enabled',
+        autoWebSearch: 'chatgpt-auto-read-aloud:auto-web-search-enabled',
         hideExtensionToggle: 'chatgpt-auto-read-aloud:hide-extension-toggle',
         bareArrowSeek: 'chatgpt-auto-read-aloud:bare-arrow-seek-enabled',
         bareArrowSafetyReset: 'chatgpt-auto-read-aloud:bare-arrow-safety-reset',
@@ -40,6 +41,7 @@
     const SELECTORS = Object.freeze({
         assistant: '[data-message-author-role="assistant"]',
         composer: '#prompt-textarea, [data-testid="composer-text-input"]',
+        composerPlus: 'button[data-testid="composer-plus-btn"], button[aria-label="Add files and more"]',
         sendButton: 'button[data-testid="send-button"]',
         extensionRead: '.cgpt-inline-readaloud',
         extensionToggle: '#cgpt-ra-floating-toggle',
@@ -61,6 +63,14 @@
     const CHECK_DEBOUNCE_MS = 120;
     const ERROR_STATE_MS = 3000;
     const DRAG_THRESHOLD_PX = 4;
+    const WEB_SEARCH_EXISTING_HYDRATION_MS = 5000;
+    const WEB_SEARCH_READY_TIMEOUT_MS = 10000;
+    const WEB_SEARCH_MENU_WAIT_MS = 1500;
+    const WEB_SEARCH_VERIFY_MS = 2000;
+    const WEB_SEARCH_MANUAL_REMOVAL_MS = 750;
+    const WEB_SEARCH_RETRY_TICK_MS = 150;
+    const WEB_SEARCH_CONTROLS_STABLE_MS = 300;
+    const WEB_SEARCH_LABEL = 'Web search';
 
     const STOP_GENERATING_RE = /(停止回答|停止生成|停止回应|Stop generating|Stop responding)/i;
     const GENERATION_ACTION_RE = /(重新生成|重新回答|重试|继续生成|继续回答|Regenerate|Try again|Continue generating|Continue response)/i;
@@ -95,6 +105,10 @@
     let suppressNextClick = false;
     let menuIds = [];
     let stylesInstalled = false;
+    let webSearchTimer = 0;
+    let webSearchTimerDueAt = 0;
+    let webSearchSequence = 0;
+    let webSearchActivation = createWebSearchActivation('', 'off', 'disabled');
 
     init();
 
@@ -111,8 +125,11 @@
         generationWasActive = isGenerationActive();
         startObserver();
         updateToggleState();
+        updateWebSearchToggleState();
+        scheduleWebSearchEvaluation(0);
         log('Loaded v' + VERSION + '.', {
             autoRead: settings.autoRead,
+            autoWebSearch: settings.autoWebSearch,
             hideExtensionToggle: settings.hideExtensionToggle,
             bareArrowSeek: settings.bareArrowSeek,
         });
@@ -184,6 +201,10 @@
     }
 
     function migrateSettings() {
+        if (gmRead(STORAGE.autoWebSearch, MISSING) === MISSING) {
+            gmWrite(STORAGE.autoWebSearch, true);
+        }
+
         if (readBoolean(STORAGE.migration, false)) return;
 
         if (gmRead(STORAGE.autoRead, MISSING) === MISSING) {
@@ -221,6 +242,7 @@
     function readSettings() {
         return {
             autoRead: readBoolean(STORAGE.autoRead, true),
+            autoWebSearch: readBoolean(STORAGE.autoWebSearch, true),
             hideExtensionToggle: readBoolean(STORAGE.hideExtensionToggle, false),
             bareArrowSeek: readBoolean(STORAGE.bareArrowSeek, false),
             position: readPosition(STORAGE.position),
@@ -233,6 +255,11 @@
         GM_addValueChangeListener(STORAGE.autoRead, (_key, _oldValue, newValue, remote) => {
             if (!remote) return;
             applyAutoReadSetting(coerceBoolean(newValue), true);
+        });
+
+        GM_addValueChangeListener(STORAGE.autoWebSearch, (_key, _oldValue, newValue, remote) => {
+            if (!remote) return;
+            applyAutoWebSearchSetting(coerceBoolean(newValue), true);
         });
 
         GM_addValueChangeListener(STORAGE.hideExtensionToggle, (_key, _oldValue, newValue, remote) => {
@@ -291,6 +318,10 @@
             () => setAutoReadEnabled(!settings.autoRead),
         ));
         menuIds.push(GM_registerMenuCommand(
+            '自动 Web Search：' + (settings.autoWebSearch ? '开（点击关闭）' : '关（点击开启）'),
+            () => setAutoWebSearchEnabled(!settings.autoWebSearch),
+        ));
+        menuIds.push(GM_registerMenuCommand(
             '原扩展图标：' + (settings.hideExtensionToggle ? '隐藏（点击显示）' : '显示（点击隐藏）'),
             () => setHideExtensionToggle(!settings.hideExtensionToggle),
         ));
@@ -298,7 +329,7 @@
             '实验性裸方向键 ±10 秒：' + (settings.bareArrowSeek ? '开（点击关闭）' : '关（点击开启）'),
             () => setBareArrowSeekEnabled(!settings.bareArrowSeek),
         ));
-        menuIds.push(GM_registerMenuCommand('重置自动朗读按钮位置', resetTogglePosition));
+        menuIds.push(GM_registerMenuCommand('重置悬浮按钮组位置', resetTogglePosition));
     }
 
     function setAutoReadEnabled(enabled) {
@@ -312,6 +343,28 @@
         if (!settings.autoRead) cancelPendingTask('disabled');
         visualState = pendingTask ? 'waiting' : 'idle';
         updateToggleState();
+        if (refreshMenus) registerMenuCommands();
+    }
+
+    function setAutoWebSearchEnabled(enabled) {
+        const nextValue = Boolean(enabled);
+        gmWrite(STORAGE.autoWebSearch, nextValue);
+        applyAutoWebSearchSetting(nextValue, true);
+    }
+
+    function applyAutoWebSearchSetting(enabled, refreshMenus) {
+        const shouldDismissMenu = !enabled && webSearchActivation.status === 'opening-menu';
+        settings.autoWebSearch = Boolean(enabled);
+        clearWebSearchTimer();
+        webSearchSequence += 1;
+        webSearchActivation = createWebSearchActivation(
+            '',
+            settings.autoWebSearch ? 'waiting' : 'off',
+            settings.autoWebSearch ? 'setting-enabled' : 'disabled',
+        );
+        updateWebSearchToggleState();
+        if (shouldDismissMenu) dismissOpenMenuBestEffort();
+        if (settings.autoWebSearch) scheduleWebSearchEvaluation(0);
         if (refreshMenus) registerMenuCommands();
     }
 
@@ -355,15 +408,17 @@
                 left: var(--cgpt-ara-left, 64px);
                 top: var(--cgpt-ara-top, 64px);
                 z-index: 2147483647;
-                width: 26px;
+                display: flex;
+                width: max-content;
                 height: 26px;
+                gap: 4px;
                 color: rgba(16, 24, 40, 0.72);
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
                 touch-action: none;
                 user-select: none;
             }
 
-            #${ROOT_ID} .cgpt-ara-toggle {
+            #${ROOT_ID} .cgpt-control-toggle {
                 position: relative;
                 display: inline-flex;
                 align-items: center;
@@ -384,8 +439,8 @@
                     color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
             }
 
-            #${ROOT_ID} .cgpt-ara-toggle:hover,
-            #${ROOT_ID} .cgpt-ara-toggle:focus-visible {
+            #${ROOT_ID} .cgpt-control-toggle:hover,
+            #${ROOT_ID} .cgpt-control-toggle:focus-visible {
                 opacity: 0.94;
                 outline: none;
                 transform: translateY(-1px);
@@ -393,13 +448,16 @@
             }
 
             #${ROOT_ID}[data-state="on"] .cgpt-ara-toggle,
-            #${ROOT_ID}[data-state="waiting"] .cgpt-ara-toggle {
+            #${ROOT_ID}[data-state="waiting"] .cgpt-ara-toggle,
+            #${ROOT_ID}[data-search-state="active"] .cgpt-web-search-toggle,
+            #${ROOT_ID}[data-search-state="waiting"] .cgpt-web-search-toggle {
                 border-color: rgba(36, 99, 235, 0.34);
                 background: rgba(36, 99, 235, 0.16);
                 color: #1d4ed8;
             }
 
-            #${ROOT_ID}[data-state="waiting"] .cgpt-ara-toggle {
+            #${ROOT_ID}[data-state="waiting"] .cgpt-ara-toggle,
+            #${ROOT_ID}[data-search-state="waiting"] .cgpt-web-search-toggle {
                 animation: cgpt-ara-pulse 1.15s ease-in-out infinite;
             }
 
@@ -410,14 +468,26 @@
                 opacity: 0.94;
             }
 
-            #${ROOT_ID}.is-dragging .cgpt-ara-toggle {
+            #${ROOT_ID}[data-search-state="skipped"] .cgpt-web-search-toggle,
+            #${ROOT_ID}[data-search-state="manual-suppressed"] .cgpt-web-search-toggle {
+                opacity: 0.72;
+            }
+
+            #${ROOT_ID}[data-search-state="failed"] .cgpt-web-search-toggle {
+                border-color: rgba(217, 119, 6, 0.42);
+                background: rgba(245, 158, 11, 0.18);
+                color: #b45309;
+                opacity: 0.94;
+            }
+
+            #${ROOT_ID}.is-dragging .cgpt-control-toggle {
                 cursor: grabbing;
                 opacity: 0.98;
                 transform: scale(1.04);
                 animation: none;
             }
 
-            #${ROOT_ID} .cgpt-ara-icon {
+            #${ROOT_ID} .cgpt-control-icon {
                 width: 13px;
                 height: 13px;
                 fill: none;
@@ -428,7 +498,7 @@
                 pointer-events: none;
             }
 
-            #${ROOT_ID} .cgpt-ara-toggle::after {
+            #${ROOT_ID} .cgpt-control-toggle::after {
                 position: absolute;
                 left: 50%;
                 top: calc(100% + 8px);
@@ -448,8 +518,8 @@
                 white-space: nowrap;
             }
 
-            #${ROOT_ID} .cgpt-ara-toggle:hover::after,
-            #${ROOT_ID} .cgpt-ara-toggle:focus-visible::after {
+            #${ROOT_ID} .cgpt-control-toggle:hover::after,
+            #${ROOT_ID} .cgpt-control-toggle:focus-visible::after {
                 opacity: 1;
                 transform: translate(-50%, 0);
             }
@@ -460,14 +530,16 @@
             }
 
             @media (prefers-color-scheme: dark) {
-                #${ROOT_ID} .cgpt-ara-toggle {
+                #${ROOT_ID} .cgpt-control-toggle {
                     border-color: rgba(255, 255, 255, 0.18);
                     background: rgba(20, 20, 24, 0.38);
                     color: rgba(255, 255, 255, 0.72);
                 }
 
                 #${ROOT_ID}[data-state="on"] .cgpt-ara-toggle,
-                #${ROOT_ID}[data-state="waiting"] .cgpt-ara-toggle {
+                #${ROOT_ID}[data-state="waiting"] .cgpt-ara-toggle,
+                #${ROOT_ID}[data-search-state="active"] .cgpt-web-search-toggle,
+                #${ROOT_ID}[data-search-state="waiting"] .cgpt-web-search-toggle {
                     border-color: rgba(96, 165, 250, 0.48);
                     background: rgba(37, 99, 235, 0.24);
                     color: #93c5fd;
@@ -475,11 +547,12 @@
             }
 
             @media (prefers-reduced-motion: reduce) {
-                #${ROOT_ID} .cgpt-ara-toggle {
+                #${ROOT_ID} .cgpt-control-toggle {
                     transition: none;
                 }
 
-                #${ROOT_ID}[data-state="waiting"] .cgpt-ara-toggle {
+                #${ROOT_ID}[data-state="waiting"] .cgpt-ara-toggle,
+                #${ROOT_ID}[data-search-state="waiting"] .cgpt-web-search-toggle {
                     animation: none;
                 }
             }
@@ -504,30 +577,48 @@
         root.id = ROOT_ID;
         root.dataset.version = VERSION;
         root.innerHTML = `
-            <button type="button" class="cgpt-ara-toggle" aria-label="自动朗读：开"
+            <button type="button" class="cgpt-control-toggle cgpt-ara-toggle" aria-label="自动朗读：开"
                 aria-pressed="true" aria-busy="false" data-tooltip="自动朗读：开">
-                <svg class="cgpt-ara-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <svg class="cgpt-control-icon cgpt-ara-icon" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M6 17h2.1l.9-2.6h6l.9 2.6H18L13.2 6h-2.4L6 17z"></path>
                     <path d="M9.7 12.5h4.6L12 7.6l-2.3 4.9z"></path>
                     <path d="M19 8c1.3 2.4 1.3 5.6 0 8"></path>
                 </svg>
             </button>
+            <button type="button" class="cgpt-control-toggle cgpt-web-search-toggle"
+                aria-label="自动 Web Search：开" aria-pressed="true" aria-busy="true"
+                data-tooltip="自动 Web Search：等待页面就绪">
+                <svg class="cgpt-control-icon cgpt-web-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="12" cy="12" r="8"></circle>
+                    <path d="M4 12h16"></path>
+                    <path d="M12 4c2.1 2.2 3.2 4.9 3.2 8S14.1 17.8 12 20"></path>
+                    <path d="M12 4c-2.1 2.2-3.2 4.9-3.2 8s1.1 5.8 3.2 8"></path>
+                </svg>
+            </button>
         `;
 
-        const button = root.querySelector('.cgpt-ara-toggle');
-        button.addEventListener('click', handleToggleClick);
+        const readButton = root.querySelector('.cgpt-ara-toggle');
+        const webSearchButton = root.querySelector('.cgpt-web-search-toggle');
+        readButton.addEventListener('click', handleToggleClick);
+        webSearchButton.addEventListener('click', handleWebSearchToggleClick);
         root.addEventListener('pointerdown', handlePointerDown);
         root.addEventListener('click', suppressDraggedClick, true);
 
         (document.body || document.documentElement).appendChild(root);
         updateTogglePosition();
         updateToggleState();
+        updateWebSearchToggleState();
         return root;
     }
 
     function handleToggleClick() {
         if (consumeSuppressedClick()) return;
         setAutoReadEnabled(!settings.autoRead);
+    }
+
+    function handleWebSearchToggleClick() {
+        if (consumeSuppressedClick()) return;
+        setAutoWebSearchEnabled(!settings.autoWebSearch);
     }
 
     function updateToggleState() {
@@ -553,6 +644,51 @@
         button.dataset.tooltip = label;
     }
 
+    function updateWebSearchToggleState() {
+        const root = document.getElementById(ROOT_ID);
+        if (!root || !settings) return;
+
+        const button = root.querySelector('.cgpt-web-search-toggle');
+        if (!button) return;
+
+        const presentation = getWebSearchPresentation();
+        root.dataset.version = VERSION;
+        root.dataset.searchState = presentation.state;
+        button.setAttribute('aria-label', presentation.label);
+        button.setAttribute('aria-pressed', settings.autoWebSearch ? 'true' : 'false');
+        button.setAttribute('aria-busy', presentation.busy ? 'true' : 'false');
+        button.setAttribute('title', presentation.label);
+        button.dataset.tooltip = presentation.label;
+    }
+
+    function getWebSearchPresentation() {
+        if (!settings.autoWebSearch || webSearchActivation.status === 'off') {
+            return { state: 'off', label: '自动 Web Search：关', busy: false };
+        }
+
+        if (webSearchActivation.status === 'active'
+            || webSearchActivation.status === 'confirming-removal') {
+            return { state: 'active', label: '自动 Web Search：开（当前会话已启用）', busy: false };
+        }
+
+        if (webSearchActivation.status === 'skipped') {
+            const reason = webSearchActivation.reason === 'tool-conflict'
+                ? '当前会话已有其他工具，已跳过'
+                : '当前页面不属于普通 Chat，已跳过';
+            return { state: 'skipped', label: '自动 Web Search：' + reason, busy: false };
+        }
+
+        if (webSearchActivation.status === 'failed') {
+            return { state: 'failed', label: '自动 Web Search：本会话开启失败', busy: false };
+        }
+
+        if (webSearchActivation.status === 'manual-suppressed') {
+            return { state: 'manual-suppressed', label: '自动 Web Search：本次尊重手动关闭', busy: false };
+        }
+
+        return { state: 'waiting', label: '自动 Web Search：等待页面就绪', busy: true };
+    }
+
     function showErrorState(message) {
         window.clearTimeout(errorTimer);
         visualState = 'error';
@@ -569,7 +705,7 @@
         if (!root) return;
 
         const rect = root.getBoundingClientRect();
-        const width = rect.width || 34;
+        const width = rect.width || 56;
         const height = rect.height || 34;
         let left;
         let top;
@@ -759,6 +895,8 @@
     }
 
     function evaluatePageState() {
+        evaluateWebSearchState();
+
         const generationActive = isGenerationActive();
 
         if (generationActive && !generationWasActive && settings.autoRead) {
@@ -772,6 +910,359 @@
 
         generationWasActive = generationActive;
         if (pendingTask) checkPendingTask(generationActive);
+    }
+
+    function createWebSearchActivation(routeKey, status, reason) {
+        const now = Date.now();
+        const isExistingConversation = routeKey.startsWith('chat:c:');
+        return {
+            token: webSearchSequence,
+            routeKey,
+            status,
+            reason: reason || '',
+            enteredAt: now,
+            readyAt: now + (isExistingConversation ? WEB_SEARCH_EXISTING_HYDRATION_MS : 0),
+            deadline: now + WEB_SEARCH_READY_TIMEOUT_MS,
+            menuDeadline: 0,
+            verifyDeadline: 0,
+            removalDeadline: 0,
+            controlsReadyAt: 0,
+            plusClicked: false,
+            itemClicked: false,
+        };
+    }
+
+    function resetWebSearchActivation(routeKey, status, reason) {
+        clearWebSearchTimer();
+        webSearchSequence += 1;
+        webSearchActivation = createWebSearchActivation(routeKey, status, reason);
+        updateWebSearchToggleState();
+    }
+
+    function scheduleWebSearchEvaluation(delayMs) {
+        if (!settings || !settings.autoWebSearch) return;
+        const safeDelay = Math.max(0, Number(delayMs) || 0);
+        const dueAt = Date.now() + safeDelay;
+
+        if (webSearchTimer && webSearchTimerDueAt <= dueAt) return;
+        clearWebSearchTimer();
+
+        const token = webSearchActivation.token;
+        webSearchTimerDueAt = dueAt;
+        webSearchTimer = window.setTimeout(() => {
+            webSearchTimer = 0;
+            webSearchTimerDueAt = 0;
+            if (token !== webSearchActivation.token) return;
+            evaluateWebSearchState();
+        }, safeDelay);
+    }
+
+    function clearWebSearchTimer() {
+        if (webSearchTimer) window.clearTimeout(webSearchTimer);
+        webSearchTimer = 0;
+        webSearchTimerDueAt = 0;
+    }
+
+    function evaluateWebSearchState() {
+        if (!settings) return;
+
+        if (!settings.autoWebSearch) {
+            if (webSearchActivation.status !== 'off') {
+                resetWebSearchActivation('', 'off', 'disabled');
+            }
+            return;
+        }
+
+        const chatContext = getOrdinaryChatContext();
+        if (!chatContext.key) {
+            if (webSearchActivation.routeKey !== ''
+                || webSearchActivation.status !== 'skipped'
+                || webSearchActivation.reason !== chatContext.reason) {
+                resetWebSearchActivation('', 'skipped', chatContext.reason);
+            }
+            return;
+        }
+
+        if (webSearchActivation.routeKey !== chatContext.key) {
+            resetWebSearchActivation(chatContext.key, 'waiting', 'route-entered');
+        }
+
+        const activation = webSearchActivation;
+        const now = Date.now();
+
+        if (activation.status === 'failed'
+            || activation.status === 'skipped'
+            || activation.status === 'manual-suppressed') {
+            return;
+        }
+
+        const form = getCurrentComposerForm();
+
+        if (activation.status === 'active') {
+            if (!form) return;
+            if (isComposerWebSearchEnabled(form)) return;
+            activation.status = 'confirming-removal';
+            activation.removalDeadline = now + WEB_SEARCH_MANUAL_REMOVAL_MS;
+            updateWebSearchToggleState();
+            scheduleWebSearchEvaluation(WEB_SEARCH_MANUAL_REMOVAL_MS);
+            return;
+        }
+
+        if (activation.status === 'confirming-removal') {
+            if (!form) {
+                activation.status = 'active';
+                activation.removalDeadline = 0;
+                updateWebSearchToggleState();
+                return;
+            }
+            if (isComposerWebSearchEnabled(form)) {
+                markWebSearchActive();
+                return;
+            }
+            if (now >= activation.removalDeadline) {
+                markWebSearchTerminal('manual-suppressed', 'manual-removal');
+                return;
+            }
+            scheduleWebSearchEvaluation(activation.removalDeadline - now);
+            return;
+        }
+
+        if (form && isComposerWebSearchEnabled(form)) {
+            markWebSearchActive();
+            return;
+        }
+
+        if (activation.status === 'opening-menu') {
+            const menuItem = findVisibleWebSearchMenuItem();
+            if (menuItem) {
+                activation.itemClicked = true;
+                activation.status = 'verifying';
+                activation.verifyDeadline = now + WEB_SEARCH_VERIFY_MS;
+                updateWebSearchToggleState();
+                try {
+                    menuItem.click();
+                } catch (error) {
+                    failWebSearchActivation('menu-item-click-failed', error);
+                    return;
+                }
+                scheduleWebSearchEvaluation(WEB_SEARCH_RETRY_TICK_MS);
+                return;
+            }
+            if (now >= activation.menuDeadline) {
+                dismissOpenMenuBestEffort();
+                failWebSearchActivation('menu-item-not-found');
+                return;
+            }
+            scheduleWebSearchEvaluation(Math.min(
+                WEB_SEARCH_RETRY_TICK_MS,
+                activation.menuDeadline - now,
+            ));
+            return;
+        }
+
+        if (activation.status === 'verifying') {
+            if (form && isComposerWebSearchEnabled(form)) {
+                markWebSearchActive();
+                return;
+            }
+            if (now >= activation.verifyDeadline) {
+                failWebSearchActivation('activation-not-confirmed');
+                return;
+            }
+            scheduleWebSearchEvaluation(Math.min(
+                WEB_SEARCH_RETRY_TICK_MS,
+                activation.verifyDeadline - now,
+            ));
+            return;
+        }
+
+        if (!form) {
+            if (now >= activation.deadline) {
+                failWebSearchActivation('composer-not-ready');
+                return;
+            }
+            scheduleWebSearchEvaluation(Math.min(
+                500,
+                activation.deadline - now,
+            ));
+            return;
+        }
+
+        if (hasSelectedNonSearchTool(form)) {
+            markWebSearchTerminal('skipped', 'tool-conflict');
+            return;
+        }
+
+        if (now < activation.readyAt) {
+            scheduleWebSearchEvaluation(activation.readyAt - now);
+            return;
+        }
+
+        const plusButton = form.querySelector(SELECTORS.composerPlus);
+        if (!isActionable(plusButton)) {
+            activation.controlsReadyAt = 0;
+            if (now >= activation.deadline) {
+                failWebSearchActivation('composer-tools-not-ready');
+                return;
+            }
+            scheduleWebSearchEvaluation(Math.min(
+                500,
+                activation.deadline - now,
+            ));
+            return;
+        }
+
+        if (!activation.controlsReadyAt) {
+            activation.controlsReadyAt = now + WEB_SEARCH_CONTROLS_STABLE_MS;
+            scheduleWebSearchEvaluation(WEB_SEARCH_CONTROLS_STABLE_MS);
+            return;
+        }
+
+        if (now < activation.controlsReadyAt) {
+            scheduleWebSearchEvaluation(activation.controlsReadyAt - now);
+            return;
+        }
+
+        activation.plusClicked = true;
+        activation.status = 'opening-menu';
+        activation.menuDeadline = now + WEB_SEARCH_MENU_WAIT_MS;
+        updateWebSearchToggleState();
+        try {
+            plusButton.click();
+        } catch (error) {
+            failWebSearchActivation('composer-tools-click-failed', error);
+            return;
+        }
+        scheduleWebSearchEvaluation(WEB_SEARCH_RETRY_TICK_MS);
+    }
+
+    function getOrdinaryChatContext() {
+        const path = window.location.pathname.replace(/\/+$/, '') || '/';
+        const ordinaryPath = path === '/' || /^\/c\/[^/]+$/.test(path);
+        if (!ordinaryPath) return { key: '', reason: 'unsupported-surface' };
+        if (!isChatSurfaceSelected()) return { key: '', reason: 'work-surface' };
+        if (isTemporaryChatActive()) return { key: '', reason: 'temporary-chat' };
+        return {
+            key: path === '/' ? 'chat:new' : 'chat:c:' + path.slice(3),
+            reason: '',
+        };
+    }
+
+    function isChatSurfaceSelected() {
+        const group = document.querySelector('[role="radiogroup"][aria-label="Select chat surface"]');
+        if (!group) return true;
+
+        const selected = Array.from(group.querySelectorAll('[role="radio"]')).find((radio) => (
+            radio.getAttribute('aria-checked') === 'true'
+            || radio.getAttribute('data-state') === 'checked'
+            || radio.getAttribute('data-selected') === 'true'
+        ));
+        return Boolean(selected && /^Chat$/i.test(normalizeText(selected.textContent)));
+    }
+
+    function isTemporaryChatActive() {
+        if (new URLSearchParams(window.location.search).get('temporary-chat') === 'true') {
+            return true;
+        }
+
+        const button = document.querySelector('button[aria-label="Temporary chat"]');
+        if (!button) return false;
+        return button.getAttribute('aria-pressed') === 'true'
+            || button.getAttribute('data-state') === 'on'
+            || button.getAttribute('data-state') === 'checked'
+            || button.getAttribute('data-active') === 'true';
+    }
+
+    function getCurrentComposerForm() {
+        const composer = Array.from(document.querySelectorAll(SELECTORS.composer)).find(isVisible);
+        return composer ? composer.closest('form') : null;
+    }
+
+    function getComposerEditor(form) {
+        if (!form) return null;
+        return Array.from(form.querySelectorAll(SELECTORS.composer)).find(isVisible) || null;
+    }
+
+    function isComposerWebSearchEnabled(form) {
+        const editor = getComposerEditor(form);
+        if (!editor) return false;
+        if (form.querySelector('[data-id="search"], [data-system-hint-type="search"]')) return true;
+
+        const placeholder = form.querySelector('textarea[name="prompt-textarea"]')
+            ?.getAttribute('placeholder');
+        return placeholder === 'Search the web'
+            && normalizeText(editor.textContent).includes(WEB_SEARCH_LABEL);
+    }
+
+    function hasSelectedNonSearchTool(form) {
+        const editor = getComposerEditor(form);
+        if (!editor) return false;
+
+        return Array.from(form.querySelectorAll('[data-system-hint-type], [data-keyword]'))
+            .some((marker) => {
+                const hint = normalizeText(marker.getAttribute('data-system-hint-type')).toLowerCase();
+                const keyword = normalizeText(marker.getAttribute('data-keyword')).toLowerCase();
+                if (hint === 'search' || keyword === WEB_SEARCH_LABEL.toLowerCase()) return false;
+                if (marker.closest('[data-file-id], [data-testid*="file"], [data-testid*="attachment"]')) {
+                    return false;
+                }
+                return Boolean(hint || keyword);
+            });
+    }
+
+    function findVisibleWebSearchMenuItem() {
+        const candidates = document.querySelectorAll('.__menu-item, [role="menuitem"]');
+        return Array.from(candidates).find((candidate) => {
+            if (!isActionable(candidate) || candidate.getAttribute('aria-disabled') === 'true') return false;
+            if (candidate.matches('[role="menuitem"]') && !candidate.closest('[role="menu"]')) return false;
+            if (normalizeText(candidate.textContent) === WEB_SEARCH_LABEL) return true;
+            return Array.from(candidate.querySelectorAll('span, div')).some((label) => (
+                label.children.length === 0
+                && normalizeText(label.textContent) === WEB_SEARCH_LABEL
+            ));
+        }) || null;
+    }
+
+    function markWebSearchActive() {
+        const wasActive = webSearchActivation.status === 'active';
+        clearWebSearchTimer();
+        webSearchActivation.status = 'active';
+        webSearchActivation.reason = '';
+        webSearchActivation.removalDeadline = 0;
+        updateWebSearchToggleState();
+        if (!wasActive) log('Web Search is active for the current ordinary chat.');
+    }
+
+    function markWebSearchTerminal(status, reason) {
+        clearWebSearchTimer();
+        webSearchActivation.status = status;
+        webSearchActivation.reason = reason;
+        updateWebSearchToggleState();
+        log('Web Search automation stopped for this chat.', { status, reason });
+    }
+
+    function failWebSearchActivation(reason, error) {
+        clearWebSearchTimer();
+        webSearchActivation.status = 'failed';
+        webSearchActivation.reason = reason;
+        updateWebSearchToggleState();
+        if (error === undefined) {
+            warn('Unable to enable Web Search for this chat.', { reason });
+        } else {
+            warn('Unable to enable Web Search for this chat.', { reason, error: String(error) });
+        }
+    }
+
+    function dismissOpenMenuBestEffort() {
+        try {
+            document.dispatchEvent(new KeyboardEvent('keydown', {
+                key: 'Escape',
+                code: 'Escape',
+                bubbles: true,
+            }));
+        } catch (_error) {
+            // A stale menu is preferable to a second tools-button click.
+        }
     }
 
     function armTask(source) {
