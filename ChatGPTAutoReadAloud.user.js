@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Auto Read Aloud
 // @namespace    http://tampermonkey.net/
-// @version      1.1.0
+// @version      1.1.1
 // @description  Automatically enable Web Search in ordinary ChatGPT chats and start native Read Aloud for newly completed replies.
 // @author       TheodorePeng
 // @match        https://chatgpt.com/*
@@ -21,7 +21,7 @@
     'use strict';
 
     const PREFIX = '[ChatGPTAutoReadAloud]';
-    const VERSION = '1.1.0';
+    const VERSION = '1.1.1';
 
     const STORAGE = Object.freeze({
         autoRead: 'chatgpt-auto-read-aloud:auto-read-enabled',
@@ -70,6 +70,7 @@
     const WEB_SEARCH_MANUAL_REMOVAL_MS = 750;
     const WEB_SEARCH_RETRY_TICK_MS = 150;
     const WEB_SEARCH_CONTROLS_STABLE_MS = 300;
+    const WEB_SEARCH_SUBMISSION_GUARD_MS = 30000;
     const WEB_SEARCH_LABEL = 'Web search';
 
     const STOP_GENERATING_RE = /(停止回答|停止生成|停止回应|Stop generating|Stop responding)/i;
@@ -109,6 +110,7 @@
     let webSearchTimerDueAt = 0;
     let webSearchSequence = 0;
     let webSearchActivation = createWebSearchActivation('', 'off', 'disabled');
+    let webSearchSubmissionGuard = null;
 
     init();
 
@@ -355,6 +357,7 @@
     function applyAutoWebSearchSetting(enabled, refreshMenus) {
         const shouldDismissMenu = !enabled && webSearchActivation.status === 'opening-menu';
         settings.autoWebSearch = Boolean(enabled);
+        webSearchSubmissionGuard = null;
         clearWebSearchTimer();
         webSearchSequence += 1;
         webSearchActivation = createWebSearchActivation(
@@ -683,7 +686,10 @@
         }
 
         if (webSearchActivation.status === 'manual-suppressed') {
-            return { state: 'manual-suppressed', label: '自动 Web Search：本次尊重手动关闭', busy: false };
+            const label = webSearchActivation.reason === 'prompt-submitted'
+                ? '自动 Web Search：本次提交后已停止自动操作'
+                : '自动 Web Search：本次尊重手动关闭';
+            return { state: 'manual-suppressed', label, busy: false };
         }
 
         return { state: 'waiting', label: '自动 Web Search：等待页面就绪', busy: true };
@@ -849,6 +855,7 @@
     function handleComposerSubmit(event) {
         const form = event.target instanceof HTMLFormElement ? event.target : null;
         if (!form || !form.querySelector(SELECTORS.composer)) return;
+        suppressWebSearchForPromptSubmission();
         armTask('composer-submit');
     }
 
@@ -859,7 +866,10 @@
         const button = target.closest(SELECTORS.sendButton);
         if (button) {
             const form = button.closest('form');
-            if (form && form.querySelector(SELECTORS.composer)) armTask('send-button');
+            if (form && form.querySelector(SELECTORS.composer)) {
+                suppressWebSearchForPromptSubmission();
+                armTask('send-button');
+            }
             return;
         }
 
@@ -963,6 +973,37 @@
         webSearchTimerDueAt = 0;
     }
 
+    function suppressWebSearchForPromptSubmission() {
+        if (!settings || !settings.autoWebSearch) return;
+
+        const chatContext = getOrdinaryChatContext();
+        if (!chatContext.key) return;
+
+        const now = Date.now();
+        if (webSearchSubmissionGuard
+            && webSearchSubmissionGuard.routeKey === chatContext.key
+            && webSearchSubmissionGuard.expiresAt > now
+            && webSearchActivation.status === 'manual-suppressed'
+            && webSearchActivation.reason === 'prompt-submitted') {
+            return;
+        }
+
+        webSearchSubmissionGuard = {
+            routeKey: chatContext.key,
+            expiresAt: now + WEB_SEARCH_SUBMISSION_GUARD_MS,
+        };
+        resetWebSearchActivation(chatContext.key, 'manual-suppressed', 'prompt-submitted');
+        log('Web Search automation stopped after prompt submission.');
+    }
+
+    function isWebSearchSubmissionContinuation(previousRouteKey, nextRouteKey, expiresAt, now) {
+        if (now >= expiresAt) return false;
+        if (previousRouteKey === 'chat:new' && nextRouteKey.startsWith('chat:c:')) return true;
+        return /^chat:c:WEB:/i.test(previousRouteKey)
+            && nextRouteKey.startsWith('chat:c:')
+            && !/^chat:c:WEB:/i.test(nextRouteKey);
+    }
+
     function evaluateWebSearchState() {
         if (!settings) return;
 
@@ -975,6 +1016,7 @@
 
         const chatContext = getOrdinaryChatContext();
         if (!chatContext.key) {
+            webSearchSubmissionGuard = null;
             if (webSearchActivation.routeKey !== ''
                 || webSearchActivation.status !== 'skipped'
                 || webSearchActivation.reason !== chatContext.reason) {
@@ -984,7 +1026,22 @@
         }
 
         if (webSearchActivation.routeKey !== chatContext.key) {
-            resetWebSearchActivation(chatContext.key, 'waiting', 'route-entered');
+            const now = Date.now();
+            const guard = webSearchSubmissionGuard;
+            if (guard
+                && guard.routeKey === webSearchActivation.routeKey
+                && isWebSearchSubmissionContinuation(
+                    guard.routeKey,
+                    chatContext.key,
+                    guard.expiresAt,
+                    now,
+                )) {
+                guard.routeKey = chatContext.key;
+                resetWebSearchActivation(chatContext.key, 'manual-suppressed', 'prompt-submitted');
+            } else {
+                webSearchSubmissionGuard = null;
+                resetWebSearchActivation(chatContext.key, 'waiting', 'route-entered');
+            }
         }
 
         const activation = webSearchActivation;
