@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT Auto Read Aloud
 // @namespace    http://tampermonkey.net/
-// @version      1.1.2
-// @description  Automatically enable Web Search in ordinary ChatGPT chats and start native Read Aloud for newly completed replies.
+// @version      1.1.3
+// @description  Enable Web Search once in a new blank ChatGPT chat and start native Read Aloud for newly completed replies.
 // @author       TheodorePeng
 // @match        https://chatgpt.com/*
 // @run-at       document-idle
@@ -21,7 +21,7 @@
     'use strict';
 
     const PREFIX = '[ChatGPTAutoReadAloud]';
-    const VERSION = '1.1.2';
+    const VERSION = '1.1.3';
 
     const STORAGE = Object.freeze({
         autoRead: 'chatgpt-auto-read-aloud:auto-read-enabled',
@@ -40,7 +40,9 @@
 
     const SELECTORS = Object.freeze({
         assistant: '[data-message-author-role="assistant"]',
+        conversationMessage: '[data-message-author-role="user"], [data-message-author-role="assistant"]',
         composer: '#prompt-textarea, [data-testid="composer-text-input"]',
+        composerAttachment: '[data-file-id], [data-testid*="attachment"], [data-testid*="file-thumbnail"]',
         composerPlus: 'button[data-testid="composer-plus-btn"], button[aria-label="Add files and more"]',
         sendButton: 'button[data-testid="send-button"]',
         extensionRead: '.cgpt-inline-readaloud',
@@ -63,14 +65,12 @@
     const CHECK_DEBOUNCE_MS = 120;
     const ERROR_STATE_MS = 3000;
     const DRAG_THRESHOLD_PX = 4;
-    const WEB_SEARCH_EXISTING_HYDRATION_MS = 5000;
     const WEB_SEARCH_READY_TIMEOUT_MS = 10000;
     const WEB_SEARCH_MENU_WAIT_MS = 1500;
     const WEB_SEARCH_VERIFY_MS = 2000;
     const WEB_SEARCH_MANUAL_REMOVAL_MS = 750;
     const WEB_SEARCH_RETRY_TICK_MS = 150;
     const WEB_SEARCH_CONTROLS_STABLE_MS = 300;
-    const WEB_SEARCH_SUBMISSION_GUARD_MS = 30000;
     const WEB_SEARCH_LABEL = 'Web search';
 
     const STOP_GENERATING_RE = /(停止回答|停止生成|停止回应|Stop generating|Stop responding)/i;
@@ -110,7 +110,6 @@
     let webSearchTimerDueAt = 0;
     let webSearchSequence = 0;
     let webSearchActivation = createWebSearchActivation('', 'off', 'disabled');
-    let webSearchSubmissionGuard = null;
 
     init();
 
@@ -357,7 +356,6 @@
     function applyAutoWebSearchSetting(enabled, refreshMenus) {
         const shouldDismissMenu = !enabled && webSearchActivation.status === 'opening-menu';
         settings.autoWebSearch = Boolean(enabled);
-        webSearchSubmissionGuard = null;
         clearWebSearchTimer();
         webSearchSequence += 1;
         webSearchActivation = createWebSearchActivation(
@@ -675,9 +673,15 @@
         }
 
         if (webSearchActivation.status === 'skipped') {
-            const reason = webSearchActivation.reason === 'tool-conflict'
-                ? '当前会话已有其他工具，已跳过'
-                : '当前页面不属于普通 Chat，已跳过';
+            const reasonLabels = {
+                'composer-not-blank': '检测到草稿或附件，本轮已停止',
+                'composer-replaced': '输入框已切换，本轮已停止',
+                'conversation-started': '对话已开始，本轮不再自动操作',
+                'existing-chat': '仅在新建空白对话开启',
+                'tool-conflict': '当前空白对话已有其他工具，已跳过',
+            };
+            const reason = reasonLabels[webSearchActivation.reason]
+                || '当前页面不属于可处理的新建空白 Chat，已跳过';
             return { state: 'skipped', label: '自动 Web Search：' + reason, busy: false };
         }
 
@@ -686,7 +690,13 @@
         }
 
         if (webSearchActivation.status === 'manual-suppressed') {
-            return { state: 'manual-suppressed', label: '自动 Web Search：提交保护中', busy: false };
+            const reasonLabels = {
+                'composer-input': '检测到输入，本轮已停止自动操作',
+                'prompt-submitted': '本次提交后已停止自动操作',
+            };
+            const label = '自动 Web Search：'
+                + (reasonLabels[webSearchActivation.reason] || '本次尊重手动关闭');
+            return { state: 'manual-suppressed', label, busy: false };
         }
 
         return { state: 'waiting', label: '自动 Web Search：等待页面就绪', busy: true };
@@ -845,8 +855,22 @@
     function bindGlobalEvents() {
         document.addEventListener('submit', handleComposerSubmit, true);
         document.addEventListener('click', handleSendButtonClick, true);
+        document.addEventListener('beforeinput', handleComposerDraftIntent, true);
+        document.addEventListener('paste', handleComposerDraftIntent, true);
+        document.addEventListener('drop', handleComposerDraftIntent, true);
+        document.addEventListener('change', handleComposerDraftIntent, true);
         window.addEventListener('keydown', handleBareArrowSeek, true);
         window.addEventListener('resize', updateTogglePosition, { passive: true });
+    }
+
+    function handleComposerDraftIntent(event) {
+        const target = event.target instanceof Element ? event.target : null;
+        if (!target) return;
+        const composerIntent = Boolean(target.closest(SELECTORS.composer));
+        const fileIntent = target.matches('input[type="file"]')
+            && Boolean(target.closest('form')?.querySelector(SELECTORS.composer));
+        if (!composerIntent && !fileIntent) return;
+        suppressPendingWebSearch('composer-input');
     }
 
     function handleComposerSubmit(event) {
@@ -921,14 +945,12 @@
 
     function createWebSearchActivation(routeKey, status, reason) {
         const now = Date.now();
-        const isExistingConversation = routeKey.startsWith('chat:c:');
         return {
             token: webSearchSequence,
             routeKey,
             status,
             reason: reason || '',
             enteredAt: now,
-            readyAt: now + (isExistingConversation ? WEB_SEARCH_EXISTING_HYDRATION_MS : 0),
             deadline: now + WEB_SEARCH_READY_TIMEOUT_MS,
             menuDeadline: 0,
             verifyDeadline: 0,
@@ -972,34 +994,19 @@
 
     function suppressWebSearchForPromptSubmission() {
         if (!settings || !settings.autoWebSearch) return;
-
-        const chatContext = getOrdinaryChatContext();
-        if (!chatContext.key) return;
-
-        const now = Date.now();
-        if (webSearchSubmissionGuard
-            && webSearchSubmissionGuard.routeKey === chatContext.key
-            && webSearchSubmissionGuard.expiresAt > now
-            && webSearchActivation.status === 'manual-suppressed'
-            && webSearchActivation.reason === 'prompt-submitted') {
-            return;
-        }
-
-        webSearchSubmissionGuard = {
-            routeKey: chatContext.key,
-            expiresAt: now + WEB_SEARCH_SUBMISSION_GUARD_MS,
-        };
-        resetWebSearchActivation(chatContext.key, 'manual-suppressed', 'prompt-submitted');
-        scheduleWebSearchEvaluation(WEB_SEARCH_SUBMISSION_GUARD_MS);
-        log('Web Search automation paused after prompt submission.');
+        if (webSearchActivation.routeKey !== 'chat:new') return;
+        if (webSearchActivation.status === 'opening-menu') dismissOpenMenuBestEffort();
+        resetWebSearchActivation('chat:new', 'manual-suppressed', 'prompt-submitted');
+        log('Web Search automation stopped after prompt submission.');
     }
 
-    function isWebSearchSubmissionContinuation(previousRouteKey, nextRouteKey, expiresAt, now) {
-        if (now >= expiresAt) return false;
-        if (previousRouteKey === 'chat:new' && nextRouteKey.startsWith('chat:c:')) return true;
-        return /^chat:c:WEB:/i.test(previousRouteKey)
-            && nextRouteKey.startsWith('chat:c:')
-            && !/^chat:c:WEB:/i.test(nextRouteKey);
+    function suppressPendingWebSearch(reason) {
+        if (!settings || !settings.autoWebSearch) return;
+        if (webSearchActivation.routeKey !== 'chat:new') return;
+        if (!['waiting', 'opening-menu', 'verifying'].includes(webSearchActivation.status)) return;
+        if (webSearchActivation.status === 'opening-menu') dismissOpenMenuBestEffort();
+        resetWebSearchActivation('chat:new', 'manual-suppressed', reason);
+        log('Web Search automation stopped before editing the prompt.', { reason });
     }
 
     function evaluateWebSearchState() {
@@ -1012,9 +1019,8 @@
             return;
         }
 
-        const chatContext = getOrdinaryChatContext();
+        const chatContext = getNewBlankChatContext();
         if (!chatContext.key) {
-            webSearchSubmissionGuard = null;
             if (webSearchActivation.routeKey !== ''
                 || webSearchActivation.status !== 'skipped'
                 || webSearchActivation.reason !== chatContext.reason) {
@@ -1024,39 +1030,11 @@
         }
 
         if (webSearchActivation.routeKey !== chatContext.key) {
-            const now = Date.now();
-            const guard = webSearchSubmissionGuard;
-            if (guard
-                && guard.routeKey === webSearchActivation.routeKey
-                && isWebSearchSubmissionContinuation(
-                    guard.routeKey,
-                    chatContext.key,
-                    guard.expiresAt,
-                    now,
-                )) {
-                guard.routeKey = chatContext.key;
-                resetWebSearchActivation(chatContext.key, 'manual-suppressed', 'prompt-submitted');
-                scheduleWebSearchEvaluation(Math.max(0, guard.expiresAt - now));
-            } else {
-                webSearchSubmissionGuard = null;
-                resetWebSearchActivation(chatContext.key, 'waiting', 'route-entered');
-            }
-        }
-
-        const now = Date.now();
-
-        if (webSearchActivation.status === 'manual-suppressed'
-            && webSearchActivation.reason === 'prompt-submitted') {
-            const guard = webSearchSubmissionGuard;
-            if (guard && guard.expiresAt > now) {
-                scheduleWebSearchEvaluation(guard.expiresAt - now);
-                return;
-            }
-            webSearchSubmissionGuard = null;
-            resetWebSearchActivation(webSearchActivation.routeKey, 'waiting', 'submission-guard-expired');
+            resetWebSearchActivation(chatContext.key, 'waiting', 'new-blank-chat');
         }
 
         const activation = webSearchActivation;
+        const now = Date.now();
 
         if (activation.status === 'failed'
             || activation.status === 'skipped'
@@ -1066,9 +1044,41 @@
 
         const form = getCurrentComposerForm();
 
+        if (!form) {
+            if (activation.plusClicked || activation.itemClicked) {
+                dismissOpenMenuBestEffort();
+                markWebSearchTerminal('skipped', 'composer-replaced');
+                return;
+            }
+            if (now >= activation.deadline) {
+                failWebSearchActivation('composer-not-ready');
+                return;
+            }
+            scheduleWebSearchEvaluation(Math.min(
+                500,
+                activation.deadline - now,
+            ));
+            return;
+        }
+
+        if (isComposerWebSearchEnabled(form)) {
+            markWebSearchActive();
+            return;
+        }
+
+        if (hasComposerDraftContent(form)) {
+            if (activation.status === 'opening-menu') dismissOpenMenuBestEffort();
+            markWebSearchTerminal('skipped', 'composer-not-blank');
+            return;
+        }
+
+        if (hasSelectedNonSearchTool(form)) {
+            if (activation.status === 'opening-menu') dismissOpenMenuBestEffort();
+            markWebSearchTerminal('skipped', 'tool-conflict');
+            return;
+        }
+
         if (activation.status === 'active') {
-            if (!form) return;
-            if (isComposerWebSearchEnabled(form)) return;
             activation.status = 'confirming-removal';
             activation.removalDeadline = now + WEB_SEARCH_MANUAL_REMOVAL_MS;
             updateWebSearchToggleState();
@@ -1077,27 +1087,11 @@
         }
 
         if (activation.status === 'confirming-removal') {
-            if (!form) {
-                activation.status = 'active';
-                activation.removalDeadline = 0;
-                updateWebSearchToggleState();
-                return;
-            }
-            if (isComposerWebSearchEnabled(form)) {
-                markWebSearchActive();
-                return;
-            }
             if (now >= activation.removalDeadline) {
-                resetWebSearchActivation(activation.routeKey, 'waiting', 'search-missing');
-                scheduleWebSearchEvaluation(0);
+                markWebSearchTerminal('manual-suppressed', 'manual-removal');
                 return;
             }
             scheduleWebSearchEvaluation(activation.removalDeadline - now);
-            return;
-        }
-
-        if (form && isComposerWebSearchEnabled(form)) {
-            markWebSearchActive();
             return;
         }
 
@@ -1130,10 +1124,6 @@
         }
 
         if (activation.status === 'verifying') {
-            if (form && isComposerWebSearchEnabled(form)) {
-                markWebSearchActive();
-                return;
-            }
             if (now >= activation.verifyDeadline) {
                 failWebSearchActivation('activation-not-confirmed');
                 return;
@@ -1142,28 +1132,6 @@
                 WEB_SEARCH_RETRY_TICK_MS,
                 activation.verifyDeadline - now,
             ));
-            return;
-        }
-
-        if (!form) {
-            if (now >= activation.deadline) {
-                failWebSearchActivation('composer-not-ready');
-                return;
-            }
-            scheduleWebSearchEvaluation(Math.min(
-                500,
-                activation.deadline - now,
-            ));
-            return;
-        }
-
-        if (hasSelectedNonSearchTool(form)) {
-            markWebSearchTerminal('skipped', 'tool-conflict');
-            return;
-        }
-
-        if (now < activation.readyAt) {
-            scheduleWebSearchEvaluation(activation.readyAt - now);
             return;
         }
 
@@ -1205,16 +1173,16 @@
         scheduleWebSearchEvaluation(WEB_SEARCH_RETRY_TICK_MS);
     }
 
-    function getOrdinaryChatContext() {
+    function getNewBlankChatContext() {
         const path = window.location.pathname.replace(/\/+$/, '') || '/';
-        const ordinaryPath = path === '/' || /^\/c\/[^/]+$/.test(path);
-        if (!ordinaryPath) return { key: '', reason: 'unsupported-surface' };
+        if (/^\/c\/[^/]+$/.test(path)) return { key: '', reason: 'existing-chat' };
+        if (path !== '/') return { key: '', reason: 'unsupported-surface' };
         if (!isChatSurfaceSelected()) return { key: '', reason: 'work-surface' };
         if (isTemporaryChatActive()) return { key: '', reason: 'temporary-chat' };
-        return {
-            key: path === '/' ? 'chat:new' : 'chat:c:' + path.slice(3),
-            reason: '',
-        };
+        if (document.querySelector(SELECTORS.conversationMessage)) {
+            return { key: '', reason: 'conversation-started' };
+        }
+        return { key: 'chat:new', reason: '' };
     }
 
     function isChatSurfaceSelected() {
@@ -1250,6 +1218,13 @@
     function getComposerEditor(form) {
         if (!form) return null;
         return Array.from(form.querySelectorAll(SELECTORS.composer)).find(isVisible) || null;
+    }
+
+    function hasComposerDraftContent(form) {
+        const editor = getComposerEditor(form);
+        if (!editor) return false;
+        if (normalizeText(editor.textContent)) return true;
+        return Boolean(form.querySelector(SELECTORS.composerAttachment));
     }
 
     function isComposerWebSearchEnabled(form) {

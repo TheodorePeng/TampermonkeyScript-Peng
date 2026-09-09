@@ -216,8 +216,8 @@ window.SCRIPTS_CATALOG = [
         id: 'chatgpt-auto-read-aloud',
         name: 'ChatGPT Auto Read Aloud',
         file: 'scripts/chatgpt-auto-read-aloud.html',
-        desc: '默认在普通 Chat 中自动维持 Web Search 开启，并配合 ChatGPT Audio Controls 自动朗读新回答，提供可拖拽双开关与低频设置。',
-        version: '1.1.2',
+        desc: '仅在新建空白普通 Chat 时自动开启一次 Web Search，并配合 ChatGPT Audio Controls 自动朗读新回答。',
+        version: '1.1.3',
         sites: 'chatgpt.com/*',
       },
       {
