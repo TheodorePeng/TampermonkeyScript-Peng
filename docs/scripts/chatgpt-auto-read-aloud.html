@@ -38,13 +38,13 @@
 
 <h1>ChatGPT Auto Read Aloud</h1>
 
-<p>这是一个面向 ChatGPT 普通 Chat 的轻量 companion userscript：默认为进入的新旧普通会话自动开启 Web Search，并可配合 <strong>ChatGPT Audio Controls &amp; Read Aloud</strong> 在新回答完成后启动原生朗读。Web Search 功能可以独立使用，不依赖音频扩展；刷新、切换会话或加载历史消息仍不会触发历史回答朗读。</p>
+<p>这是一个面向 ChatGPT 普通 Chat 的轻量 companion userscript：默认自动维持 Web Search 开启，并可配合 <strong>ChatGPT Audio Controls &amp; Read Aloud</strong> 在新回答完成后启动原生朗读。Web Search 功能可以独立使用，不依赖音频扩展；刷新、切换会话或加载历史消息仍不会触发历史回答朗读。</p>
 
 <h2 id="info">基本信息</h2>
 
 <table class="info-table">
   <tr><th>脚本名称</th><td>ChatGPT Auto Read Aloud</td></tr>
-  <tr><th>版本</th><td><code>1.1.1</code></td></tr>
+  <tr><th>版本</th><td><code>1.1.2</code></td></tr>
   <tr><th>作者</th><td>TheodorePeng</td></tr>
   <tr><th>适用站点</th><td><code>chatgpt.com/*</code></td></tr>
   <tr><th>依赖</th><td>Web Search 无依赖；自动朗读推荐安装 <a href="https://github.com/infoxica/chatgpt-audio-controls" target="_blank">ChatGPT Audio Controls &amp; Read Aloud</a></td></tr>
@@ -61,9 +61,9 @@
 <h2 id="features">功能介绍</h2>
 
 <ul>
-  <li><strong>自动 Web Search</strong>：默认开启；进入普通新 Chat 或普通旧会话时，若当前输入框尚未启用搜索，会通过“加号 → Web search”自动开启一次。</li>
+  <li><strong>自动 Web Search</strong>：默认开启；普通 Chat 输入框若被稳定探测为未启用搜索，会通过“加号 → Web search”重新开启。</li>
   <li><strong>会话状态恢复</strong>：重新打开旧会话时先等待 ChatGPT 恢复已保存的搜索状态，已有 Search 时不会重复打开菜单。</li>
-  <li><strong>尊重当前选择</strong>：手动移除 Search 后，本次停留期间不会重新开启；已选择 Deep research、Create image 或插件等其他工具时，本次会话跳过自动搜索，普通文件附件不受影响。</li>
+  <li><strong>持续维持搜索</strong>：手动移除 Search 后会再次自动开启；已选择 Deep research、Create image 或插件等其他工具时，本次会话跳过自动搜索，普通文件附件不受影响。</li>
   <li><strong>普通 Chat 限定</strong>：不处理 Work、Temporary Chat、Project、自定义 GPT 或其他非普通 Chat 页面。</li>
   <li><strong>自动朗读新回答</strong>：默认开启；只处理脚本运行后由当前页面新发起的回答，每条最多触发一次。</li>
   <li><strong>原生播放</strong>：优先点击 Audio Controls 扩展为目标回答注入的 <code>.cgpt-inline-readaloud</code>，备用路径只使用回答内部直接可见的 ChatGPT 原生朗读按钮，不实现额外 TTS。</li>
@@ -72,7 +72,7 @@
   <li><strong>双悬浮开关</strong>：页面显示半透明 Auto/Speaker 和 Web Search 地球按钮；两个功能分别开关、分别显示等待或错误状态。</li>
   <li><strong>拖拽与位置记忆</strong>：按住按钮拖动即可调整位置，刷新和切换会话后继续使用上次位置。</li>
   <li><strong>低频菜单设置</strong>：Tampermonkey 菜单可分别开关自动朗读与自动 Web Search、隐藏原扩展的空闲 Logo、启用实验性裸左右方向键 seek，或重置悬浮按钮位置。</li>
-  <li><strong>低资源安全失败</strong>：复用一个页面观察器，不运行永久轮询；每个会话最多点击一次搜索入口。找不到搜索或朗读控件时只显示对应错误状态并输出去敏日志，不修改草稿、不循环点击。</li>
+  <li><strong>低资源安全失败</strong>：复用一个页面观察器，不运行永久轮询；只在页面变化或短时验证窗口中检查状态。找不到搜索或朗读控件时只显示对应错误状态并输出去敏日志，不修改草稿、不无限循环点击。</li>
 </ul>
 
 <h2 id="usage">使用方法</h2>
@@ -89,11 +89,12 @@
 <h2 id="notes">注意事项</h2>
 
 <ul>
-  <li>v1.1.1 修复 prompt 提交后延迟开启 Web Search 可能恢复已提交草稿的问题；提交发生时会立即终止当前搜索任务，并安全跨越新 Chat 的临时/正式 URL 转换。</li>
+  <li>v1.1.2 移除“尊重本次手动关闭”：普通 Chat 的 Search 被稳定探测为缺失时会自动重新开启；提交后仍保留 30 秒保护，保护到期后恢复探测。</li>
+  <li>v1.1.1 修复 prompt 提交后延迟开启 Web Search 可能恢复已提交草稿的问题；提交发生时会立即暂停当前搜索任务，并安全跨越新 Chat 的临时/正式 URL 转换。</li>
   <li>v1.1.0 新增默认开启的普通 Chat 自动 Web Search、独立地球按钮、会话级手动关闭保护和低资源一次性状态机。</li>
   <li>升级时会继承 v0.1.4 已保存的自动朗读状态和悬浮位置；自动 Web Search 在没有旧状态时默认开启，因此从 v1.0.2 升级后会立即生效。</li>
   <li>Web Search 只使用 ChatGPT 当前网页的“加号 → Web search”入口。页面结构改变、账号暂不可用或菜单项缺失时，本会话会安全失败并停止；脚本不会向输入框写入 <code>@web search</code> 兜底。</li>
-  <li>手动移除当前 Search 只抑制本次停留；离开并重新进入该普通会话后，若总开关仍为开启，脚本会再次自动处理。</li>
+  <li>自动 Web Search 总开关开启时，手动移除当前 Search 会触发再次开启；如需保持关闭，请关闭脚本的 Web Search 地球开关。</li>
   <li>Work、Temporary Chat、Project、自定义 GPT 和已选择其他工具的输入框不会被自动改成 Web Search。</li>
   <li>v1.0.2 允许同一条新 Chat 回答将一次临时 <code>WEB:</code> 会话 ID 安全升级为正式 ID；其他会话 ID 变化仍会取消待处理任务，避免朗读切换后的历史回答。</li>
   <li>隐藏扩展 Logo 只影响 <code>#cgpt-ra-floating-toggle</code>，不会隐藏回答朗读按钮或播放中的进度、暂停、倍速和音量控件。</li>

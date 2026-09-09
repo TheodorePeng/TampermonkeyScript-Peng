@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Auto Read Aloud
 // @namespace    http://tampermonkey.net/
-// @version      1.1.1
+// @version      1.1.2
 // @description  Automatically enable Web Search in ordinary ChatGPT chats and start native Read Aloud for newly completed replies.
 // @author       TheodorePeng
 // @match        https://chatgpt.com/*
@@ -21,7 +21,7 @@
     'use strict';
 
     const PREFIX = '[ChatGPTAutoReadAloud]';
-    const VERSION = '1.1.1';
+    const VERSION = '1.1.2';
 
     const STORAGE = Object.freeze({
         autoRead: 'chatgpt-auto-read-aloud:auto-read-enabled',
@@ -686,10 +686,7 @@
         }
 
         if (webSearchActivation.status === 'manual-suppressed') {
-            const label = webSearchActivation.reason === 'prompt-submitted'
-                ? '自动 Web Search：本次提交后已停止自动操作'
-                : '自动 Web Search：本次尊重手动关闭';
-            return { state: 'manual-suppressed', label, busy: false };
+            return { state: 'manual-suppressed', label: '自动 Web Search：提交保护中', busy: false };
         }
 
         return { state: 'waiting', label: '自动 Web Search：等待页面就绪', busy: true };
@@ -993,7 +990,8 @@
             expiresAt: now + WEB_SEARCH_SUBMISSION_GUARD_MS,
         };
         resetWebSearchActivation(chatContext.key, 'manual-suppressed', 'prompt-submitted');
-        log('Web Search automation stopped after prompt submission.');
+        scheduleWebSearchEvaluation(WEB_SEARCH_SUBMISSION_GUARD_MS);
+        log('Web Search automation paused after prompt submission.');
     }
 
     function isWebSearchSubmissionContinuation(previousRouteKey, nextRouteKey, expiresAt, now) {
@@ -1038,14 +1036,27 @@
                 )) {
                 guard.routeKey = chatContext.key;
                 resetWebSearchActivation(chatContext.key, 'manual-suppressed', 'prompt-submitted');
+                scheduleWebSearchEvaluation(Math.max(0, guard.expiresAt - now));
             } else {
                 webSearchSubmissionGuard = null;
                 resetWebSearchActivation(chatContext.key, 'waiting', 'route-entered');
             }
         }
 
-        const activation = webSearchActivation;
         const now = Date.now();
+
+        if (webSearchActivation.status === 'manual-suppressed'
+            && webSearchActivation.reason === 'prompt-submitted') {
+            const guard = webSearchSubmissionGuard;
+            if (guard && guard.expiresAt > now) {
+                scheduleWebSearchEvaluation(guard.expiresAt - now);
+                return;
+            }
+            webSearchSubmissionGuard = null;
+            resetWebSearchActivation(webSearchActivation.routeKey, 'waiting', 'submission-guard-expired');
+        }
+
+        const activation = webSearchActivation;
 
         if (activation.status === 'failed'
             || activation.status === 'skipped'
@@ -1077,7 +1088,8 @@
                 return;
             }
             if (now >= activation.removalDeadline) {
-                markWebSearchTerminal('manual-suppressed', 'manual-removal');
+                resetWebSearchActivation(activation.routeKey, 'waiting', 'search-missing');
+                scheduleWebSearchEvaluation(0);
                 return;
             }
             scheduleWebSearchEvaluation(activation.removalDeadline - now);
