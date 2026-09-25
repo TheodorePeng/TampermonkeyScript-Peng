@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ChatGPT Auto Read Aloud
 // @namespace    http://tampermonkey.net/
-// @version      1.1.3
+// @version      1.1.4
 // @description  Enable Web Search once in a new blank ChatGPT chat and start native Read Aloud for newly completed replies.
 // @author       TheodorePeng
 // @match        https://chatgpt.com/*
@@ -21,7 +21,7 @@
     'use strict';
 
     const PREFIX = '[ChatGPTAutoReadAloud]';
-    const VERSION = '1.1.3';
+    const VERSION = '1.1.4';
 
     const STORAGE = Object.freeze({
         autoRead: 'chatgpt-auto-read-aloud:auto-read-enabled',
@@ -41,10 +41,10 @@
     const SELECTORS = Object.freeze({
         assistant: '[data-message-author-role="assistant"]',
         conversationMessage: '[data-message-author-role="user"], [data-message-author-role="assistant"]',
-        composer: '#prompt-textarea, [data-testid="composer-text-input"]',
+        composer: '#prompt-textarea, [data-testid="composer-text-input"], form[data-chatgpt-composer] [contenteditable="true"][role="textbox"]',
         composerAttachment: '[data-file-id], [data-testid*="attachment"], [data-testid*="file-thumbnail"]',
         composerPlus: 'button[data-testid="composer-plus-btn"], button[aria-label="Add files and more"]',
-        sendButton: 'button[data-testid="send-button"]',
+        sendButton: 'button[data-testid="send-button"], button[aria-label="Send"]',
         extensionRead: '.cgpt-inline-readaloud',
         extensionToggle: '#cgpt-ra-floating-toggle',
         seekBack: '.cgpt-ra-back',
@@ -123,7 +123,7 @@
         registerMenuCommands();
         registerValueListeners();
         bindGlobalEvents();
-        generationWasActive = isGenerationActive();
+        generationWasActive = settings.autoRead && isGenerationActive();
         startObserver();
         updateToggleState();
         updateWebSearchToggleState();
@@ -340,8 +340,11 @@
     }
 
     function applyAutoReadSetting(enabled, refreshMenus) {
+        const wasEnabled = settings.autoRead;
         settings.autoRead = Boolean(enabled);
         if (!settings.autoRead) cancelPendingTask('disabled');
+        if (settings.autoRead && !wasEnabled) generationWasActive = isGenerationActive();
+        if (observer && settings.autoRead !== wasEnabled) observePageChanges();
         visualState = pendingTask ? 'waiting' : 'idle';
         updateToggleState();
         if (refreshMenus) registerMenuCommands();
@@ -910,10 +913,15 @@
             ensureToggleMounted();
             scheduleEvaluation();
         });
+        observePageChanges();
+    }
+
+    function observePageChanges() {
+        observer.disconnect();
         observer.observe(document.documentElement, {
             childList: true,
             subtree: true,
-            characterData: true,
+            characterData: settings.autoRead,
         });
     }
 
@@ -927,6 +935,7 @@
 
     function evaluatePageState() {
         evaluateWebSearchState();
+        if (!settings.autoRead) return;
 
         const generationActive = isGenerationActive();
 
@@ -956,6 +965,7 @@
             verifyDeadline: 0,
             removalDeadline: 0,
             controlsReadyAt: 0,
+            composerIdentity: '',
             plusClicked: false,
             itemClicked: false,
         };
@@ -1033,16 +1043,26 @@
             resetWebSearchActivation(chatContext.key, 'waiting', 'new-blank-chat');
         }
 
-        const activation = webSearchActivation;
+        let activation = webSearchActivation;
         const now = Date.now();
+
+        const form = getCurrentComposerForm();
+        const composerIdentity = form?.querySelector('[data-above-composer-conversation-id]')
+            ?.getAttribute('data-above-composer-conversation-id') || '';
+        if (composerIdentity && activation.composerIdentity
+            && composerIdentity !== activation.composerIdentity) {
+            resetWebSearchActivation(chatContext.key, 'waiting', 'new-blank-chat');
+            activation = webSearchActivation;
+        }
+        if (composerIdentity && !activation.composerIdentity) {
+            activation.composerIdentity = composerIdentity;
+        }
 
         if (activation.status === 'failed'
             || activation.status === 'skipped'
             || activation.status === 'manual-suppressed') {
             return;
         }
-
-        const form = getCurrentComposerForm();
 
         if (!form) {
             if (activation.plusClicked || activation.itemClicked) {
@@ -1186,6 +1206,14 @@
     }
 
     function isChatSurfaceSelected() {
+        const modeGroup = document.querySelector('[role="group"][aria-label="Composer mode"]');
+        if (modeGroup) {
+            return Array.from(modeGroup.querySelectorAll('button')).some((button) => (
+                /^Chat$/i.test(normalizeText(button.getAttribute('aria-label') || button.textContent))
+                && button.getAttribute('aria-pressed') === 'true'
+            ));
+        }
+
         const group = document.querySelector('[role="radiogroup"][aria-label="Select chat surface"]');
         if (!group) return true;
 
@@ -1230,6 +1258,7 @@
     function isComposerWebSearchEnabled(form) {
         const editor = getComposerEditor(form);
         if (!editor) return false;
+        if (form.querySelector('button[aria-label="Remove Web search"]')) return true;
         if (form.querySelector('[data-id="search"], [data-system-hint-type="search"]')) return true;
 
         const placeholder = form.querySelector('textarea[name="prompt-textarea"]')
@@ -1241,6 +1270,9 @@
     function hasSelectedNonSearchTool(form) {
         const editor = getComposerEditor(form);
         if (!editor) return false;
+        if (form.querySelector('button[aria-label^="Remove "]:not([aria-label="Remove Web search"])')) {
+            return true;
+        }
 
         return Array.from(form.querySelectorAll('[data-system-hint-type], [data-keyword]'))
             .some((marker) => {
@@ -1255,7 +1287,7 @@
     }
 
     function findVisibleWebSearchMenuItem() {
-        const candidates = document.querySelectorAll('.__menu-item, [role="menuitem"]');
+        const candidates = document.querySelectorAll('.__menu-item, [role="menuitem"], [data-composer-overlay-floating-ui="true"] button[data-list-navigation-item="true"]');
         return Array.from(candidates).find((candidate) => {
             if (!isActionable(candidate) || candidate.getAttribute('aria-disabled') === 'true') return false;
             if (candidate.matches('[role="menuitem"]') && !candidate.closest('[role="menu"]')) return false;

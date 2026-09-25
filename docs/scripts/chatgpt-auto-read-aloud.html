@@ -44,7 +44,7 @@
 
 <table class="info-table">
   <tr><th>脚本名称</th><td>ChatGPT Auto Read Aloud</td></tr>
-  <tr><th>版本</th><td><code>1.1.3</code></td></tr>
+  <tr><th>版本</th><td><code>1.1.4</code></td></tr>
   <tr><th>作者</th><td>TheodorePeng</td></tr>
   <tr><th>适用站点</th><td><code>chatgpt.com/*</code></td></tr>
   <tr><th>依赖</th><td>Web Search 无依赖；自动朗读推荐安装 <a href="https://github.com/infoxica/chatgpt-audio-controls" target="_blank">ChatGPT Audio Controls &amp; Read Aloud</a></td></tr>
@@ -89,6 +89,7 @@
 <h2 id="notes">注意事项</h2>
 
 <ul>
+  <li>v1.1.4 适配新版 ChatGPT 输入框与 Web search 菜单；同一首页连续新建空白对话会重新尝试一次。关闭自动朗读时暂停回答扫描与文本变化观察。</li>
   <li>v1.1.3 将自动 Search 严格限制为新建空白普通 Chat；已有对话、已有草稿和提交后均不会自动点击工具菜单，并移除旧会话 hydration 与 30 秒 Search 提交延续状态。</li>
   <li>v1.1.2 曾尝试在 Search 被移除后重新开启；该行为已由 v1.1.3 取代。</li>
   <li>v1.1.1 修复 prompt 提交后延迟开启 Web Search 可能恢复已提交草稿的问题；提交发生时会立即终止当前搜索任务，并安全跨越新 Chat 的临时/正式 URL 转换。</li>

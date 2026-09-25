@@ -94,7 +94,7 @@
 
 | 脚本 | 功能简介 | 适用站点 |
 |------|---------|---------|
-| **[ChatGPTAutoReadAloud.user.js](ChatGPTAutoReadAloud.user.js)** | 仅在新建空白普通 Chat 时自动开启一次 Web Search，并配合 ChatGPT Audio Controls 在新回答完成后自动触发原生 Read Aloud；已有对话、已有草稿和提交后均不再自动操作 Search | `chatgpt.com/*` |
+| **[ChatGPTAutoReadAloud.user.js](ChatGPTAutoReadAloud.user.js)** | 仅在新建空白普通 Chat 时自动开启一次 Web Search，并配合 ChatGPT Audio Controls 在新回答完成后自动触发原生 Read Aloud；已有对话、已有草稿和提交后均不再自动操作 Search，关闭自动朗读时暂停回答扫描 | `chatgpt.com/*` |
 | **[DoubaoTimelineMarkdownExporter.js](DoubaoTimelineMarkdownExporter.js)** | 在豆包 Bilibili 视频解读页右下角添加悬浮按钮，一键把豆包生成的高亮时间线提取为 Markdown bullets | `doubao.com/summary/bilibili/*` |
 
 ---
