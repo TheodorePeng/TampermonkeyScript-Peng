@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT Auto Read Aloud
 // @namespace    http://tampermonkey.net/
-// @version      1.1.4
-// @description  Enable Web Search once in a new blank ChatGPT chat and start native Read Aloud for newly completed replies.
+// @version      1.1.5
+// @description  Add Web Search on globe click, auto-enable it once in new blank chats, and start native Read Aloud for newly completed replies.
 // @author       TheodorePeng
 // @match        https://chatgpt.com/*
 // @run-at       document-idle
@@ -21,7 +21,7 @@
     'use strict';
 
     const PREFIX = '[ChatGPTAutoReadAloud]';
-    const VERSION = '1.1.4';
+    const VERSION = '1.1.5';
 
     const STORAGE = Object.freeze({
         autoRead: 'chatgpt-auto-read-aloud:auto-read-enabled',
@@ -590,8 +590,8 @@
                 </svg>
             </button>
             <button type="button" class="cgpt-control-toggle cgpt-web-search-toggle"
-                aria-label="自动 Web Search：开" aria-pressed="true" aria-busy="true"
-                data-tooltip="自动 Web Search：等待页面就绪">
+                aria-label="添加 Web Search" aria-pressed="false" aria-busy="false"
+                data-tooltip="点击为当前输入框添加 Web Search">
                 <svg class="cgpt-control-icon cgpt-web-search-icon" viewBox="0 0 24 24" aria-hidden="true">
                     <circle cx="12" cy="12" r="8"></circle>
                     <path d="M4 12h16"></path>
@@ -622,7 +622,24 @@
 
     function handleWebSearchToggleClick() {
         if (consumeSuppressedClick()) return;
-        setAutoWebSearchEnabled(!settings.autoWebSearch);
+        const context = getManualWebSearchContext();
+        if (!context.key) return;
+        const form = getCurrentComposerForm();
+        if (!form) return;
+        if (webSearchActivation.manual
+            && webSearchActivation.routeKey === context.key
+            && webSearchActivation.form === form
+            && webSearchActivation.editor === getComposerEditor(form)
+            && webSearchActivation.composerIdentity === getComposerIdentity(form)
+            && ['waiting', 'opening-menu', 'verifying'].includes(webSearchActivation.status)) return;
+
+        if (webSearchActivation.status === 'opening-menu') dismissOpenMenuBestEffort();
+        resetWebSearchActivation(context.key, 'waiting', 'manual-click');
+        webSearchActivation.manual = true;
+        webSearchActivation.form = form;
+        webSearchActivation.editor = getComposerEditor(form);
+        webSearchActivation.composerIdentity = getComposerIdentity(form);
+        evaluateWebSearchState();
     }
 
     function updateToggleState() {
@@ -656,16 +673,30 @@
         if (!button) return;
 
         const presentation = getWebSearchPresentation();
+        const label = presentation.label + '；点击添加 Web Search';
         root.dataset.version = VERSION;
         root.dataset.searchState = presentation.state;
-        button.setAttribute('aria-label', presentation.label);
-        button.setAttribute('aria-pressed', settings.autoWebSearch ? 'true' : 'false');
+        button.setAttribute('aria-label', label);
+        button.setAttribute('aria-pressed', isComposerWebSearchEnabled(getCurrentComposerForm()) ? 'true' : 'false');
         button.setAttribute('aria-busy', presentation.busy ? 'true' : 'false');
-        button.setAttribute('title', presentation.label);
-        button.dataset.tooltip = presentation.label;
+        button.setAttribute('title', label);
+        button.dataset.tooltip = label;
     }
 
     function getWebSearchPresentation() {
+        if (webSearchActivation.manual) {
+            const status = webSearchActivation.status;
+            if (status === 'active') {
+                return { state: 'active', label: 'Web Search：当前输入框已启用', busy: false };
+            }
+            if (status === 'failed') {
+                return { state: 'failed', label: 'Web Search：添加失败，可点击重试', busy: false };
+            }
+            if (status === 'skipped' || status === 'manual-suppressed') {
+                return { state: status, label: 'Web Search：本次添加已停止', busy: false };
+            }
+            return { state: 'waiting', label: 'Web Search：正在添加', busy: true };
+        }
         if (!settings.autoWebSearch || webSearchActivation.status === 'off') {
             return { state: 'off', label: '自动 Web Search：关', busy: false };
         }
@@ -968,6 +999,9 @@
             composerIdentity: '',
             plusClicked: false,
             itemClicked: false,
+            manual: false,
+            form: null,
+            editor: null,
         };
     }
 
@@ -979,7 +1013,7 @@
     }
 
     function scheduleWebSearchEvaluation(delayMs) {
-        if (!settings || !settings.autoWebSearch) return;
+        if (!settings || (!settings.autoWebSearch && !webSearchActivation.manual)) return;
         const safeDelay = Math.max(0, Number(delayMs) || 0);
         const dueAt = Date.now() + safeDelay;
 
@@ -1003,6 +1037,11 @@
     }
 
     function suppressWebSearchForPromptSubmission() {
+        if (webSearchActivation.manual) {
+            if (webSearchActivation.status === 'opening-menu') dismissOpenMenuBestEffort();
+            markWebSearchTerminal('manual-suppressed', 'prompt-submitted');
+            return;
+        }
         if (!settings || !settings.autoWebSearch) return;
         if (webSearchActivation.routeKey !== 'chat:new') return;
         if (webSearchActivation.status === 'opening-menu') dismissOpenMenuBestEffort();
@@ -1011,6 +1050,12 @@
     }
 
     function suppressPendingWebSearch(reason) {
+        if (webSearchActivation.manual) {
+            if (!['waiting', 'opening-menu', 'verifying'].includes(webSearchActivation.status)) return;
+            if (webSearchActivation.status === 'opening-menu') dismissOpenMenuBestEffort();
+            markWebSearchTerminal('manual-suppressed', reason);
+            return;
+        }
         if (!settings || !settings.autoWebSearch) return;
         if (webSearchActivation.routeKey !== 'chat:new') return;
         if (!['waiting', 'opening-menu', 'verifying'].includes(webSearchActivation.status)) return;
@@ -1022,14 +1067,35 @@
     function evaluateWebSearchState() {
         if (!settings) return;
 
-        if (!settings.autoWebSearch) {
+        // A manual request is scoped to the exact route and composer clicked by the user.
+        if (webSearchActivation.manual) {
+            const context = getManualWebSearchContext();
+            const form = getCurrentComposerForm();
+            if (context.key !== webSearchActivation.routeKey) {
+                if (webSearchActivation.status === 'opening-menu') dismissOpenMenuBestEffort();
+                resetWebSearchActivation('', settings.autoWebSearch ? 'waiting' : 'off', 'route-changed');
+                scheduleWebSearchEvaluation(0);
+                return;
+            }
+            if (form !== webSearchActivation.form
+                || getComposerEditor(form) !== webSearchActivation.editor
+                || getComposerIdentity(form) !== webSearchActivation.composerIdentity) {
+                if (webSearchActivation.status === 'opening-menu') dismissOpenMenuBestEffort();
+                resetWebSearchActivation('', settings.autoWebSearch ? 'waiting' : 'off', 'composer-replaced');
+                scheduleWebSearchEvaluation(0);
+                return;
+            }
+        }
+
+        if (!settings.autoWebSearch && !webSearchActivation.manual) {
             if (webSearchActivation.status !== 'off') {
                 resetWebSearchActivation('', 'off', 'disabled');
             }
             return;
         }
 
-        const chatContext = getNewBlankChatContext();
+        const chatContext = webSearchActivation.manual
+            ? getManualWebSearchContext() : getNewBlankChatContext();
         if (!chatContext.key) {
             if (webSearchActivation.routeKey !== ''
                 || webSearchActivation.status !== 'skipped'
@@ -1047,8 +1113,7 @@
         const now = Date.now();
 
         const form = getCurrentComposerForm();
-        const composerIdentity = form?.querySelector('[data-above-composer-conversation-id]')
-            ?.getAttribute('data-above-composer-conversation-id') || '';
+        const composerIdentity = getComposerIdentity(form);
         if (composerIdentity && activation.composerIdentity
             && composerIdentity !== activation.composerIdentity) {
             resetWebSearchActivation(chatContext.key, 'waiting', 'new-blank-chat');
@@ -1086,7 +1151,7 @@
             return;
         }
 
-        if (hasComposerDraftContent(form)) {
+        if (!activation.manual && hasComposerDraftContent(form)) {
             if (activation.status === 'opening-menu') dismissOpenMenuBestEffort();
             markWebSearchTerminal('skipped', 'composer-not-blank');
             return;
@@ -1095,6 +1160,17 @@
         if (hasSelectedNonSearchTool(form)) {
             if (activation.status === 'opening-menu') dismissOpenMenuBestEffort();
             markWebSearchTerminal('skipped', 'tool-conflict');
+            return;
+        }
+
+        if (activation.manual && isGenerationActive()) {
+            if (activation.status === 'opening-menu') dismissOpenMenuBestEffort();
+            markWebSearchTerminal('skipped', 'generation-active');
+            return;
+        }
+
+        if (activation.manual && activation.status === 'active') {
+            markWebSearchTerminal('manual-suppressed', 'manual-removal');
             return;
         }
 
@@ -1115,7 +1191,9 @@
             return;
         }
 
-        if (activation.status === 'opening-menu') {
+        // Reuse an already-open tools menu instead of toggling it closed.
+        if (activation.status === 'opening-menu'
+            || (activation.manual && activation.status === 'waiting' && findVisibleWebSearchMenuItem())) {
             const menuItem = findVisibleWebSearchMenuItem();
             if (menuItem) {
                 activation.itemClicked = true;
@@ -1203,6 +1281,21 @@
             return { key: '', reason: 'conversation-started' };
         }
         return { key: 'chat:new', reason: '' };
+    }
+
+    function getManualWebSearchContext() {
+        const path = window.location.pathname.replace(/\/+$/, '') || '/';
+        if (path !== '/' && !/^\/c\/[^/]+$/.test(path)) {
+            return { key: '', reason: 'unsupported-surface' };
+        }
+        if (!isChatSurfaceSelected()) return { key: '', reason: 'work-surface' };
+        if (isTemporaryChatActive()) return { key: '', reason: 'temporary-chat' };
+        return { key: 'manual:' + window.location.pathname + window.location.search, reason: '' };
+    }
+
+    function getComposerIdentity(form) {
+        return form?.querySelector('[data-above-composer-conversation-id]')
+            ?.getAttribute('data-above-composer-conversation-id') || '';
     }
 
     function isChatSurfaceSelected() {
