@@ -1285,7 +1285,10 @@
 
     function getManualWebSearchContext() {
         const path = window.location.pathname.replace(/\/+$/, '') || '/';
-        if (path !== '/' && !/^\/c\/[^/]+$/.test(path)) {
+        // Project conversation URLs may include a project-name suffix after the ID.
+        // Allow explicit clicks here; automatic activation stays limited to blank ordinary chats.
+        const isProjectChat = /^\/g\/g-p-[a-f0-9]{32}(?:-[^/]+)?\/c\/[^/]+$/i.test(path);
+        if (path !== '/' && !/^\/c\/[^/]+$/.test(path) && !isProjectChat) {
             return { key: '', reason: 'unsupported-surface' };
         }
         if (!isChatSurfaceSelected()) return { key: '', reason: 'work-surface' };
@@ -1399,7 +1402,7 @@
         webSearchActivation.reason = '';
         webSearchActivation.removalDeadline = 0;
         updateWebSearchToggleState();
-        if (!wasActive) log('Web Search is active for the current ordinary chat.');
+        if (!wasActive) log('Web Search is active for the current chat.');
     }
 
     function markWebSearchTerminal(status, reason) {

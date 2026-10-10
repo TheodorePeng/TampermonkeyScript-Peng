@@ -38,7 +38,7 @@
 
 <h1>ChatGPT Auto Read Aloud</h1>
 
-<p>这是一个面向 ChatGPT 普通 Chat 的轻量 companion userscript：点击地球图标即可为当前输入框添加 Web Search，支持已有对话和已写好的草稿；自动开启仍只处理新建空白普通会话。脚本还可配合 <strong>ChatGPT Audio Controls &amp; Read Aloud</strong> 在新回答完成后启动原生朗读；刷新、切换会话或加载历史消息不会触发历史回答朗读。</p>
+<p>这是一个面向 ChatGPT 的轻量 companion userscript：点击地球图标即可为当前输入框添加 Web Search，支持普通 Chat、Projects 对话和已写好的草稿；自动开启仍只处理新建空白普通会话。脚本还可配合 <strong>ChatGPT Audio Controls &amp; Read Aloud</strong> 在新回答完成后启动原生朗读；刷新、切换会话或加载历史消息不会触发历史回答朗读。</p>
 
 <h2 id="info">基本信息</h2>
 
@@ -62,9 +62,9 @@
 
 <ul>
   <li><strong>只处理新建空白 Chat</strong>：默认开启；仅当路径为 <code>/</code>、没有对话消息、输入框为空且没有附件或其他工具时，通过“加号 → Web search”自动开启一次。</li>
-  <li><strong>手动添加 Search</strong>：点击地球按钮为当前普通 Chat 添加 Web Search，支持 <code>/c/&lt;id&gt;</code> 已有对话和已有草稿，自动开关关闭时也可使用。已启用时不会重复添加或移除，手动移除后可再次点击添加。</li>
+  <li><strong>手动添加 Search</strong>：点击地球按钮为当前普通 Chat 或 Projects 对话添加 Web Search，支持 <code>/c/&lt;id&gt;</code> 和 <code>/g/g-p-&lt;项目 ID&gt;[-项目名称]/c/&lt;id&gt;</code>，保留已有草稿，自动开关关闭时也可使用。已启用时不会重复添加或移除，手动移除后可再次点击添加。</li>
   <li><strong>输入安全闸门</strong>：输入、粘贴或提交会取消待执行的 Search 点击。手动添加任务只处理点击时的输入框，切换会话或输入框后立即停止；脚本不写入、清空或恢复草稿。</li>
-  <li><strong>普通 Chat 限定</strong>：不处理 Work、Temporary Chat、Project、自定义 GPT 或其他非普通 Chat 页面。</li>
+  <li><strong>支持范围</strong>：手动添加支持普通 Chat 和 Projects 对话；自动开启仅用于新建空白普通 Chat。不处理 Work、Temporary Chat、自定义 GPT 或其他页面。</li>
   <li><strong>自动朗读新回答</strong>：默认开启；只处理脚本运行后由当前页面新发起的回答，每条最多触发一次。</li>
   <li><strong>原生播放</strong>：优先点击 Audio Controls 扩展为目标回答注入的 <code>.cgpt-inline-readaloud</code>，备用路径只使用回答内部直接可见的 ChatGPT 原生朗读按钮，不实现额外 TTS。</li>
   <li><strong>新会话安全</strong>：等待任务会跨越新 Chat 从临时 <code>WEB:</code> 会话 ID 到正式会话 URL 的切换，不会误取消首轮自动朗读，也不会在首次回答生成时重新登记或干预整个会话。</li>
@@ -89,6 +89,7 @@
 <h2 id="notes">注意事项</h2>
 
 <ul>
+  <li>Projects 兼容修复：地球按钮支持 Projects 对话路径及项目名称后缀，自动开启范围不变。</li>
   <li>v1.1.5 将地球按钮改为手动添加当前 Web Search，支持已有普通对话、已有草稿和关闭自动开启后的使用；重复点击不会移除 Search，提交或切换输入框会取消待执行任务。</li>
   <li>v1.1.4 适配新版 ChatGPT 输入框与 Web search 菜单；同一首页连续新建空白对话会重新尝试一次。关闭自动朗读时暂停回答扫描与文本变化观察。</li>
   <li>v1.1.3 将自动 Search 严格限制为新建空白普通 Chat；已有对话、已有草稿和提交后均不会自动点击工具菜单，并移除旧会话 hydration 与 30 秒 Search 提交延续状态。</li>
