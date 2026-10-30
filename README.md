@@ -94,7 +94,7 @@
 
 | 脚本 | 功能简介 | 适用站点 |
 |------|---------|---------|
-| **[ChatGPTAutoReadAloud.user.js](ChatGPTAutoReadAloud.user.js)** | 点击地球图标为当前普通 Chat 或 Projects 对话添加 Web Search，支持已有对话和草稿；仍仅在新建空白普通 Chat 自动开启一次，并配合 ChatGPT Audio Controls 自动朗读新回答，关闭自动朗读时暂停回答扫描 | `chatgpt.com/*` |
+| **[ChatGPTToolkit.user.js](ChatGPTToolkit.user.js)** | ChatGPT 综合效率工具箱：支持剪贴板一键重命名会话（带微调确认/全自动双模式）、快捷 Web Search 开启、原生语音朗读，集成可拖拽悬浮胶囊与非模态独立设置面板 | `chatgpt.com/*` |
 | **[DoubaoTimelineMarkdownExporter.js](DoubaoTimelineMarkdownExporter.js)** | 在豆包 Bilibili 视频解读页右下角添加悬浮按钮，一键把豆包生成的高亮时间线提取为 Markdown bullets | `doubao.com/summary/bilibili/*` |
 
 ---

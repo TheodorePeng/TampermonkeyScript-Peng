@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         ChatGPT Auto Read Aloud
+// @name         ChatGPT Toolkit
 // @namespace    http://tampermonkey.net/
-// @version      1.1.5
-// @description  Add Web Search on globe click, auto-enable it once in new blank chats, and start native Read Aloud for newly completed replies.
+// @version      1.3.0
+// @description  Comprehensive toolkit for ChatGPT: one-click session title renaming from clipboard, quick Web Search toggle, optional native Read Aloud, with a draggable floating capsule and non-blocking settings panel.
 // @author       TheodorePeng
 // @match        https://chatgpt.com/*
 // @run-at       document-idle
@@ -12,30 +12,51 @@
 // @grant        GM_getValue
 // @grant        GM_setValue
 // @grant        GM_addValueChangeListener
+// @grant        unsafeWindow
 // @noframes
-// @updateURL    https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/ChatGPTAutoReadAloud.user.js
-// @downloadURL  https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/ChatGPTAutoReadAloud.user.js
+// @updateURL    https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/ChatGPTToolkit.user.js
+// @downloadURL  https://raw.githubusercontent.com/TheodorePeng/TampermonkeyScript-Peng/main/ChatGPTToolkit.user.js
 // ==/UserScript==
 
 (function () {
     'use strict';
 
-    const PREFIX = '[ChatGPTAutoReadAloud]';
-    const VERSION = '1.1.5';
+    const PREFIX = '[ChatGPTToolkit]';
+    const VERSION = '1.3.0';
 
     const STORAGE = Object.freeze({
+        autoRead: 'chatgpt-toolkit:auto-read-enabled',
+        autoWebSearch: 'chatgpt-toolkit:auto-web-search-enabled',
+        hideExtensionToggle: 'chatgpt-toolkit:hide-extension-toggle',
+        bareArrowSeek: 'chatgpt-toolkit:bare-arrow-seek-enabled',
+        bareArrowSafetyReset: 'chatgpt-toolkit:bare-arrow-safety-reset',
+        showRename: 'chatgpt-toolkit:show-rename-toggle',
+        showWebSearch: 'chatgpt-toolkit:show-web-search-toggle',
+        showAutoRead: 'chatgpt-toolkit:show-auto-read-toggle',
+        renameRequireConfirm: 'chatgpt-toolkit:rename-require-confirm',
+        position: 'chatgpt-toolkit:floating-position',
+        migration: 'chatgpt-toolkit:migration-v2',
+    });
+
+    const LEGACY_STORAGE = Object.freeze({
         autoRead: 'chatgpt-auto-read-aloud:auto-read-enabled',
         autoWebSearch: 'chatgpt-auto-read-aloud:auto-web-search-enabled',
         hideExtensionToggle: 'chatgpt-auto-read-aloud:hide-extension-toggle',
         bareArrowSeek: 'chatgpt-auto-read-aloud:bare-arrow-seek-enabled',
         bareArrowSafetyReset: 'chatgpt-auto-read-aloud:bare-arrow-safety-reset',
+        showRename: 'chatgpt-auto-read-aloud:show-rename-toggle',
+        showWebSearch: 'chatgpt-auto-read-aloud:show-web-search-toggle',
+        showAutoRead: 'chatgpt-auto-read-aloud:show-auto-read-toggle',
+        renameRequireConfirm: 'chatgpt-auto-read-aloud:rename-require-confirm',
         position: 'chatgpt-auto-read-aloud:floating-position',
-        migration: 'chatgpt-auto-read-aloud:migration-v1',
+        oldV1AutoRead: 'chatgpt-auto-read-aloud:v0.1.4:autoReadEnabled',
+        oldV1Position: 'chatgpt-auto-read-aloud:controlPosition',
     });
 
-    const LEGACY_STORAGE = Object.freeze({
-        autoRead: 'chatgpt-auto-read-aloud:v0.1.4:autoReadEnabled',
-        position: 'chatgpt-auto-read-aloud:controlPosition',
+    const VISIBILITY_SETTINGS = Object.freeze({
+        showAutoRead: STORAGE.showAutoRead,
+        showWebSearch: STORAGE.showWebSearch,
+        showRename: STORAGE.showRename,
     });
 
     const SELECTORS = Object.freeze({
@@ -50,10 +71,15 @@
         seekBack: '.cgpt-ra-back',
         seekForward: '.cgpt-ra-forward',
         nativeRead: '[data-testid="voice-play-turn-action-button"]',
+        renameToggle: '.cgpt-rename-toggle',
+        sidebarConversationLink: 'nav a[href*="/c/"], aside a[href*="/c/"]',
+        renameInput: '[role="dialog"] input:not([type="checkbox"]):not([type="radio"]), [role="menu"] input:not([type="checkbox"]):not([type="radio"]), input[aria-label*="Rename" i], input[aria-label*="重命名"]',
+        userMessage: '[data-message-author-role="user"]',
     });
 
     const ROOT_ID = 'cgpt-auto-read-aloud-root';
     const STYLE_ID = 'cgpt-auto-read-aloud-style';
+    const SETTINGS_MODAL_ID = 'cgpt-auto-read-aloud-settings-modal';
     const HIDE_ATTRIBUTE = 'data-cgpt-ara-hide-extension-toggle';
     const MISSING = '__CGPT_ARA_MISSING__';
 
@@ -72,6 +98,13 @@
     const WEB_SEARCH_RETRY_TICK_MS = 150;
     const WEB_SEARCH_CONTROLS_STABLE_MS = 300;
     const WEB_SEARCH_LABEL = 'Web search';
+
+    const RENAME_MENU_WAIT_MS = 1500;
+    const RENAME_INPUT_WAIT_MS = 2000;
+    const RENAME_RETRY_TICK_MS = 120;
+    const RENAME_TITLE_MAX_LENGTH = 40;
+    const RENAME_ACTION_RE = /(chat actions|actions|options|更多|操作)/i;
+    const RENAME_MENUITEM_RE = /^(rename|rename chat|重命名|重命名对话)$/i;
 
     const STOP_GENERATING_RE = /(停止回答|停止生成|停止回应|Stop generating|Stop responding)/i;
     const GENERATION_ACTION_RE = /(重新生成|重新回答|重试|继续生成|继续回答|Regenerate|Try again|Continue generating|Continue response)/i;
@@ -110,6 +143,8 @@
     let webSearchTimerDueAt = 0;
     let webSearchSequence = 0;
     let webSearchActivation = createWebSearchActivation('', 'off', 'disabled');
+    let renameSequence = 0;
+    let renameState = 'idle';
 
     init();
 
@@ -120,6 +155,7 @@
         installStyles();
         applyExtensionToggleVisibility();
         ensureToggleMounted();
+        applyButtonVisibility();
         registerMenuCommands();
         registerValueListeners();
         bindGlobalEvents();
@@ -133,6 +169,9 @@
             autoWebSearch: settings.autoWebSearch,
             hideExtensionToggle: settings.hideExtensionToggle,
             bareArrowSeek: settings.bareArrowSeek,
+            showAutoRead: settings.showAutoRead,
+            showWebSearch: settings.showWebSearch,
+            showRename: settings.showRename,
         });
     }
 
@@ -202,33 +241,39 @@
     }
 
     function migrateSettings() {
-        if (gmRead(STORAGE.autoWebSearch, MISSING) === MISSING) {
-            gmWrite(STORAGE.autoWebSearch, true);
-        }
+        const keysToMigrate = [
+            ['autoRead', true],
+            ['autoWebSearch', true],
+            ['hideExtensionToggle', false],
+            ['bareArrowSeek', false],
+            ['bareArrowSafetyReset', false],
+            ['showRename', true],
+            ['showWebSearch', true],
+            ['showAutoRead', false],
+            ['renameRequireConfirm', true],
+        ];
 
-        if (readBoolean(STORAGE.migration, false)) return;
-
-        if (gmRead(STORAGE.autoRead, MISSING) === MISSING) {
-            const legacyAutoRead = gmRead(LEGACY_STORAGE.autoRead, MISSING);
-            gmWrite(
-                STORAGE.autoRead,
-                legacyAutoRead === MISSING
-                    ? true
-                    : (typeof legacyAutoRead === 'string' ? legacyAutoRead === 'true' : Boolean(legacyAutoRead)),
-            );
+        for (const [key, defaultVal] of keysToMigrate) {
+            if (gmRead(STORAGE[key], MISSING) === MISSING) {
+                const legacyVal = gmRead(LEGACY_STORAGE[key], MISSING);
+                if (legacyVal !== MISSING) {
+                    gmWrite(STORAGE[key], typeof legacyVal === 'string' ? legacyVal === 'true' : Boolean(legacyVal));
+                } else {
+                    gmWrite(STORAGE[key], defaultVal);
+                }
+            }
         }
 
         if (gmRead(STORAGE.position, MISSING) === MISSING) {
-            const legacyPosition = readPosition(LEGACY_STORAGE.position);
+            const legacyPosition = readPosition(LEGACY_STORAGE.position) || readPosition(LEGACY_STORAGE.oldV1Position);
             if (legacyPosition) gmWrite(STORAGE.position, legacyPosition);
         }
 
-        if (gmRead(STORAGE.hideExtensionToggle, MISSING) === MISSING) {
-            gmWrite(STORAGE.hideExtensionToggle, false);
-        }
-
-        if (gmRead(STORAGE.bareArrowSeek, MISSING) === MISSING) {
-            gmWrite(STORAGE.bareArrowSeek, false);
+        if (gmRead(STORAGE.autoRead, MISSING) === MISSING) {
+            const legacyAutoRead = gmRead(LEGACY_STORAGE.oldV1AutoRead, MISSING);
+            if (legacyAutoRead !== MISSING) {
+                gmWrite(STORAGE.autoRead, typeof legacyAutoRead === 'string' ? legacyAutoRead === 'true' : Boolean(legacyAutoRead));
+            }
         }
 
         gmWrite(STORAGE.migration, true);
@@ -246,6 +291,10 @@
             autoWebSearch: readBoolean(STORAGE.autoWebSearch, true),
             hideExtensionToggle: readBoolean(STORAGE.hideExtensionToggle, false),
             bareArrowSeek: readBoolean(STORAGE.bareArrowSeek, false),
+            showAutoRead: readBoolean(STORAGE.showAutoRead, false),
+            showWebSearch: readBoolean(STORAGE.showWebSearch, true),
+            showRename: readBoolean(STORAGE.showRename, true),
+            renameRequireConfirm: readBoolean(STORAGE.renameRequireConfirm, true),
             position: readPosition(STORAGE.position),
         };
     }
@@ -274,6 +323,33 @@
             if (!remote) return;
             settings.bareArrowSeek = coerceBoolean(newValue);
             registerMenuCommands();
+        });
+
+        GM_addValueChangeListener(STORAGE.showAutoRead, (_key, _oldValue, newValue, remote) => {
+            if (!remote) return;
+            settings.showAutoRead = coerceBoolean(newValue);
+            applyButtonVisibility();
+            syncSettingsModalState();
+        });
+
+        GM_addValueChangeListener(STORAGE.showWebSearch, (_key, _oldValue, newValue, remote) => {
+            if (!remote) return;
+            settings.showWebSearch = coerceBoolean(newValue);
+            applyButtonVisibility();
+            syncSettingsModalState();
+        });
+
+        GM_addValueChangeListener(STORAGE.showRename, (_key, _oldValue, newValue, remote) => {
+            if (!remote) return;
+            settings.showRename = coerceBoolean(newValue);
+            applyButtonVisibility();
+            syncSettingsModalState();
+        });
+
+        GM_addValueChangeListener(STORAGE.renameRequireConfirm, (_key, _oldValue, newValue, remote) => {
+            if (!remote) return;
+            settings.renameRequireConfirm = coerceBoolean(newValue);
+            syncSettingsModalState();
         });
 
         GM_addValueChangeListener(STORAGE.position, (_key, _oldValue, newValue, remote) => {
@@ -331,6 +407,12 @@
             () => setBareArrowSeekEnabled(!settings.bareArrowSeek),
         ));
         menuIds.push(GM_registerMenuCommand('重置悬浮按钮组位置', resetTogglePosition));
+        menuIds.push(GM_registerMenuCommand('⚙️ 悬浮按钮显示设置...', openSettingsModal));
+        try {
+            const targetWin = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
+            targetWin.__cgpt_openSettingsModal = openSettingsModal;
+            targetWin.__cgpt_runRenameWorkflow = runRenameWorkflow;
+        } catch (_) {}
     }
 
     function setAutoReadEnabled(enabled) {
@@ -398,12 +480,237 @@
         );
     }
 
+    function setVisibilitySetting(name, enabled) {
+        if (!Object.prototype.hasOwnProperty.call(VISIBILITY_SETTINGS, name)) return;
+        settings[name] = Boolean(enabled);
+        gmWrite(VISIBILITY_SETTINGS[name], settings[name]);
+        if (name === 'showAutoRead' && !enabled) {
+            setAutoReadEnabled(false);
+        }
+        applyButtonVisibility();
+        updateTogglePosition();
+    }
+
+    function applyButtonVisibility() {
+        const root = document.getElementById(ROOT_ID);
+        if (!root || !settings) return;
+        root.dataset.showAutoRead = settings.showAutoRead ? 'true' : 'false';
+        root.dataset.showWebSearch = settings.showWebSearch ? 'true' : 'false';
+        root.dataset.showRename = settings.showRename ? 'true' : 'false';
+    }
+
+    let settingsDragState = null;
+    let settingsPosition = null;
+
+    function handleSettingsPointerDown(event) {
+        if (event.button !== 0 || !event.isPrimary) return;
+        if (event.target && event.target.closest('button, input, a')) return;
+        const modal = document.getElementById(SETTINGS_MODAL_ID);
+        if (!modal) return;
+        const rect = modal.getBoundingClientRect();
+        settingsDragState = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            startLeft: rect.left,
+            startTop: rect.top,
+        };
+        const header = event.currentTarget;
+        try {
+            header.setPointerCapture(event.pointerId);
+        } catch (_) {}
+        header.addEventListener('pointermove', handleSettingsPointerMove);
+        header.addEventListener('pointerup', handleSettingsPointerEnd);
+        header.addEventListener('pointercancel', handleSettingsPointerEnd);
+    }
+
+    function handleSettingsPointerMove(event) {
+        if (!settingsDragState || event.pointerId !== settingsDragState.pointerId) return;
+        const deltaX = event.clientX - settingsDragState.startX;
+        const deltaY = event.clientY - settingsDragState.startY;
+        let left = clamp(settingsDragState.startLeft + deltaX, 8, Math.max(8, window.innerWidth - 340));
+        let top = clamp(settingsDragState.startTop + deltaY, 8, Math.max(8, window.innerHeight - 300));
+        settingsPosition = { left: Math.round(left), top: Math.round(top) };
+        applySettingsPosition();
+    }
+
+    function handleSettingsPointerEnd(event) {
+        if (!settingsDragState || event.pointerId !== settingsDragState.pointerId) return;
+        const header = event.currentTarget;
+        try {
+            header.releasePointerCapture(event.pointerId);
+        } catch (_) {}
+        header.removeEventListener('pointermove', handleSettingsPointerMove);
+        header.removeEventListener('pointerup', handleSettingsPointerEnd);
+        header.removeEventListener('pointercancel', handleSettingsPointerEnd);
+        settingsDragState = null;
+    }
+
+    function applySettingsPosition() {
+        const modal = document.getElementById(SETTINGS_MODAL_ID);
+        if (!modal) return;
+        let left;
+        let top;
+        if (settingsPosition) {
+            left = settingsPosition.left;
+            top = settingsPosition.top;
+        } else {
+            const root = document.getElementById(ROOT_ID);
+            const rootRect = root ? root.getBoundingClientRect() : null;
+            if (rootRect) {
+                left = rootRect.left;
+                top = rootRect.bottom + 8;
+            } else {
+                left = 64;
+                top = 110;
+            }
+        }
+        left = clamp(left, 8, Math.max(8, window.innerWidth - 340));
+        top = clamp(top, 8, Math.max(8, window.innerHeight - 300));
+        modal.style.setProperty('--cgpt-settings-left', Math.round(left) + 'px');
+        modal.style.setProperty('--cgpt-settings-top', Math.round(top) + 'px');
+    }
+
+    function openSettingsModal() {
+        let modal = document.getElementById(SETTINGS_MODAL_ID);
+        if (!modal) modal = createSettingsModal();
+        syncSettingsModalState(modal);
+        applySettingsPosition();
+        modal.classList.add('is-open');
+        const firstInput = modal.querySelector('input[type="checkbox"]');
+        if (firstInput) firstInput.focus();
+    }
+
+    function createSettingsModal() {
+        const modal = document.createElement('div');
+        modal.id = SETTINGS_MODAL_ID;
+        modal.setAttribute('role', 'region');
+        modal.setAttribute('aria-label', 'ChatGPT Toolkit 设置');
+        modal.innerHTML = `
+            <div class="cgpt-settings-dialog">
+                <div class="cgpt-settings-header" title="按住可拖拽移动位置">
+                    <h2 class="cgpt-settings-title">悬浮设置</h2>
+                    <button type="button" class="cgpt-settings-close" aria-label="关闭设置">×</button>
+                </div>
+                <div class="cgpt-settings-section-title">悬浮图标显隐</div>
+                <label class="cgpt-settings-row">
+                    <input type="checkbox" data-setting="showAutoRead" />
+                    <span>显示「自动朗读」按钮</span>
+                </label>
+                <label class="cgpt-settings-row">
+                    <input type="checkbox" data-setting="showWebSearch" />
+                    <span>显示「Web Search」按钮</span>
+                </label>
+                <label class="cgpt-settings-row">
+                    <input type="checkbox" data-setting="showRename" />
+                    <span>显示「重命名」按钮</span>
+                </label>
+
+                <div class="cgpt-settings-section-title">重命名工具配置</div>
+                <label class="cgpt-settings-row">
+                    <input type="checkbox" data-setting="renameRequireConfirm" />
+                    <span>重命名需手动确认保存</span>
+                </label>
+                <p class="cgpt-settings-hint">开启时填入标题后由你微调并按回车确认；关闭则一键自动提交。</p>
+
+                <div class="cgpt-settings-footer">
+                    <button type="button" class="cgpt-settings-done">完成</button>
+                </div>
+            </div>
+        `;
+
+        const header = modal.querySelector('.cgpt-settings-header');
+        if (header) {
+            header.addEventListener('pointerdown', handleSettingsPointerDown);
+        }
+
+        modal.addEventListener('change', handleSettingsModalChange);
+        modal.addEventListener('click', handleSettingsModalClick);
+        document.addEventListener('keydown', handleSettingsModalKeydown);
+        (document.body || document.documentElement).appendChild(modal);
+        return modal;
+    }
+
+    function closeSettingsModal() {
+        const modal = document.getElementById(SETTINGS_MODAL_ID);
+        if (!modal || !modal.classList.contains('is-open')) return;
+        modal.classList.remove('is-open');
+    }
+
+    function syncSettingsModalState(modal) {
+        const modalElement = modal || document.getElementById(SETTINGS_MODAL_ID);
+        if (!modalElement || !settings) return;
+        for (const input of modalElement.querySelectorAll('input[type="checkbox"][data-setting]')) {
+            const name = input.dataset.setting;
+            if (name === 'renameRequireConfirm') {
+                input.checked = Boolean(settings.renameRequireConfirm);
+            } else if (Object.prototype.hasOwnProperty.call(VISIBILITY_SETTINGS, name)) {
+                input.checked = Boolean(settings[name]);
+            }
+        }
+    }
+
+    function handleSettingsModalChange(event) {
+        const input = event.target;
+        if (!(input instanceof HTMLInputElement) || input.type !== 'checkbox') return;
+        const name = input.dataset.setting;
+        if (name === 'renameRequireConfirm') {
+            settings.renameRequireConfirm = input.checked;
+            gmWrite(STORAGE.renameRequireConfirm, settings.renameRequireConfirm);
+            return;
+        }
+        setVisibilitySetting(name, input.checked);
+    }
+
+    function handleSettingsModalClick(event) {
+        const target = event.target instanceof Element ? event.target : null;
+        if (!target) return;
+        if (target.closest('.cgpt-settings-close, .cgpt-settings-done')) {
+            closeSettingsModal();
+        }
+    }
+
+    function handleSettingsModalKeydown(event) {
+        if (event.key !== 'Escape') return;
+        closeSettingsModal();
+    }
+
+    function showToast(message, type = 'info') {
+        let toast = document.getElementById('cgpt-toast-notification');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'cgpt-toast-notification';
+            (document.body || document.documentElement).appendChild(toast);
+        }
+        toast.textContent = message;
+        toast.className = 'cgpt-toast-' + type;
+        toast.style.display = 'block';
+        toast.style.opacity = '1';
+        window.clearTimeout(showToast.timer);
+        showToast.timer = window.setTimeout(() => {
+            toast.style.opacity = '0';
+            window.setTimeout(() => {
+                if (toast.style.opacity === '0') toast.style.display = 'none';
+            }, 200);
+        }, 2200);
+    }
+
     function installStyles() {
         if (stylesInstalled || document.getElementById(STYLE_ID)) return;
         stylesInstalled = true;
 
         const css = `
             html[${HIDE_ATTRIBUTE}="true"] ${SELECTORS.extensionToggle} {
+                display: none !important;
+            }
+
+            #${ROOT_ID}[data-show-auto-read="false"] .cgpt-ara-toggle,
+            #${ROOT_ID}[data-show-web-search="false"] .cgpt-web-search-toggle,
+            #${ROOT_ID}[data-show-rename="false"] .cgpt-rename-toggle {
+                display: none !important;
+            }
+
+            #${ROOT_ID}[data-show-auto-read="false"][data-show-web-search="false"][data-show-rename="false"] {
                 display: none !important;
             }
 
@@ -484,6 +791,20 @@
                 opacity: 0.94;
             }
 
+            #${ROOT_ID}[data-rename-state="waiting"] .cgpt-rename-toggle {
+                border-color: rgba(36, 99, 235, 0.34);
+                background: rgba(36, 99, 235, 0.16);
+                color: #1d4ed8;
+                animation: cgpt-ara-pulse 1.15s ease-in-out infinite;
+            }
+
+            #${ROOT_ID}[data-rename-state="failed"] .cgpt-rename-toggle {
+                border-color: rgba(217, 119, 6, 0.42);
+                background: rgba(245, 158, 11, 0.18);
+                color: #b45309;
+                opacity: 0.94;
+            }
+
             #${ROOT_ID}.is-dragging .cgpt-control-toggle {
                 cursor: grabbing;
                 opacity: 0.98;
@@ -533,6 +854,136 @@
                 50% { box-shadow: 0 8px 24px rgba(37, 99, 235, 0.34); }
             }
 
+            #${SETTINGS_MODAL_ID} {
+                position: fixed;
+                top: var(--cgpt-settings-top, 110px);
+                left: var(--cgpt-settings-left, 64px);
+                z-index: 2147483647;
+                display: none;
+                pointer-events: none;
+                color: #101828;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            }
+
+            #${SETTINGS_MODAL_ID}.is-open {
+                display: block;
+            }
+
+            #${SETTINGS_MODAL_ID} .cgpt-settings-dialog {
+                pointer-events: auto;
+                width: 320px;
+                padding: 16px 18px 14px;
+                border: 1px solid rgba(20, 28, 44, 0.14);
+                border-radius: 16px;
+                background: rgba(255, 255, 255, 0.95);
+                backdrop-filter: blur(16px);
+                -webkit-backdrop-filter: blur(16px);
+                box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.08);
+            }
+
+            #${SETTINGS_MODAL_ID} .cgpt-settings-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 12px;
+                cursor: move;
+                padding-bottom: 6px;
+                border-bottom: 1px solid rgba(16, 24, 40, 0.08);
+                margin-bottom: 8px;
+                user-select: none;
+                -webkit-user-select: none;
+            }
+
+            #${SETTINGS_MODAL_ID} .cgpt-settings-title {
+                margin: 0;
+                font-size: 14px;
+                font-weight: 700;
+            }
+
+            #${SETTINGS_MODAL_ID} .cgpt-settings-section-title {
+                margin: 8px 0 2px;
+                font-size: 11px;
+                font-weight: 600;
+                color: rgba(16, 24, 40, 0.5);
+                letter-spacing: 0.3px;
+                user-select: none;
+                -webkit-user-select: none;
+            }
+
+            #${SETTINGS_MODAL_ID} .cgpt-settings-close {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 24px;
+                height: 24px;
+                padding: 0;
+                border: 0;
+                border-radius: 50%;
+                background: transparent;
+                color: rgba(16, 24, 40, 0.58);
+                cursor: pointer;
+                font-size: 17px;
+                line-height: 1;
+            }
+
+            #${SETTINGS_MODAL_ID} .cgpt-settings-close:hover,
+            #${SETTINGS_MODAL_ID} .cgpt-settings-close:focus-visible {
+                background: rgba(16, 24, 40, 0.08);
+                color: #101828;
+                outline: none;
+            }
+
+            #${SETTINGS_MODAL_ID} .cgpt-settings-hint {
+                margin: 2px 0 8px;
+                color: rgba(16, 24, 40, 0.55);
+                font-size: 11px;
+                line-height: 1.4;
+            }
+
+            #${SETTINGS_MODAL_ID} .cgpt-settings-row {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 6px 2px;
+                font-size: 13px;
+                cursor: pointer;
+                user-select: none;
+                -webkit-user-select: none;
+            }
+
+            #${SETTINGS_MODAL_ID} .cgpt-settings-row input[type="checkbox"] {
+                flex: none;
+                width: 15px;
+                height: 15px;
+                margin: 0;
+                accent-color: #1d4ed8;
+                cursor: pointer;
+            }
+
+            #${SETTINGS_MODAL_ID} .cgpt-settings-footer {
+                display: flex;
+                justify-content: flex-end;
+                margin-top: 8px;
+            }
+
+            #${SETTINGS_MODAL_ID} .cgpt-settings-done {
+                padding: 6px 14px;
+                border: 0;
+                border-radius: 999px;
+                background: #1d4ed8;
+                color: #fff;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 600;
+                transition: background 0.16s ease;
+            }
+
+            #${SETTINGS_MODAL_ID} .cgpt-settings-done:hover,
+            #${SETTINGS_MODAL_ID} .cgpt-settings-done:focus-visible {
+                background: #1e40af;
+                outline: none;
+            }
+
             @media (prefers-color-scheme: dark) {
                 #${ROOT_ID} .cgpt-control-toggle {
                     border-color: rgba(255, 255, 255, 0.18);
@@ -548,6 +999,70 @@
                     background: rgba(37, 99, 235, 0.24);
                     color: #93c5fd;
                 }
+
+                #${SETTINGS_MODAL_ID} {
+                    color: rgba(255, 255, 255, 0.92);
+                }
+
+                #${SETTINGS_MODAL_ID} .cgpt-settings-dialog {
+                    border-color: rgba(255, 255, 255, 0.16);
+                    background: rgba(24, 24, 28, 0.95);
+                    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+                }
+
+                #${SETTINGS_MODAL_ID} .cgpt-settings-header {
+                    border-bottom-color: rgba(255, 255, 255, 0.1);
+                }
+
+                #${SETTINGS_MODAL_ID} .cgpt-settings-section-title {
+                    color: rgba(255, 255, 255, 0.45);
+                }
+
+                #${SETTINGS_MODAL_ID} .cgpt-settings-close {
+                    color: rgba(255, 255, 255, 0.6);
+                }
+
+                #${SETTINGS_MODAL_ID} .cgpt-settings-close:hover,
+                #${SETTINGS_MODAL_ID} .cgpt-settings-close:focus-visible {
+                    background: rgba(255, 255, 255, 0.12);
+                    color: #fff;
+                }
+
+                #${SETTINGS_MODAL_ID} .cgpt-settings-hint {
+                    color: rgba(255, 255, 255, 0.52);
+                }
+            }
+
+            #cgpt-toast-notification {
+                position: fixed;
+                top: 24px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 2147483647;
+                display: none;
+                padding: 7px 15px;
+                border-radius: 8px;
+                border: 1px solid rgba(20, 28, 44, 0.16);
+                background: rgba(255, 255, 255, 0.88);
+                backdrop-filter: blur(12px) saturate(130%);
+                -webkit-backdrop-filter: blur(12px) saturate(130%);
+                box-shadow: 0 8px 24px rgba(20, 28, 44, 0.14);
+                color: rgba(16, 24, 40, 0.9);
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                font-size: 13px;
+                font-weight: 500;
+                pointer-events: none;
+                transition: opacity 0.2s ease;
+                white-space: nowrap;
+            }
+
+            @media (prefers-color-scheme: dark) {
+                #cgpt-toast-notification {
+                    border-color: rgba(255, 255, 255, 0.18);
+                    background: rgba(28, 28, 34, 0.88);
+                    color: rgba(255, 255, 255, 0.92);
+                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+                }
             }
 
             @media (prefers-reduced-motion: reduce) {
@@ -556,7 +1071,8 @@
                 }
 
                 #${ROOT_ID}[data-state="waiting"] .cgpt-ara-toggle,
-                #${ROOT_ID}[data-search-state="waiting"] .cgpt-web-search-toggle {
+                #${ROOT_ID}[data-search-state="waiting"] .cgpt-web-search-toggle,
+                #${ROOT_ID}[data-rename-state="waiting"] .cgpt-rename-toggle {
                     animation: none;
                 }
             }
@@ -599,19 +1115,42 @@
                     <path d="M12 4c-2.1 2.2-3.2 4.9-3.2 8s1.1 5.8 3.2 8"></path>
                 </svg>
             </button>
+            <button type="button" class="cgpt-control-toggle cgpt-rename-toggle"
+                aria-label="重命名当前对话" aria-pressed="false" aria-busy="false"
+                data-tooltip="重命名当前对话">
+                <svg class="cgpt-control-icon cgpt-rename-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 20h9"></path>
+                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+                </svg>
+            </button>
         `;
 
         const readButton = root.querySelector('.cgpt-ara-toggle');
         const webSearchButton = root.querySelector('.cgpt-web-search-toggle');
+        const renameButton = root.querySelector('.cgpt-rename-toggle');
         readButton.addEventListener('click', handleToggleClick);
         webSearchButton.addEventListener('click', handleWebSearchToggleClick);
+        renameButton.addEventListener('click', handleRenameToggleClick);
         root.addEventListener('pointerdown', handlePointerDown);
         root.addEventListener('click', suppressDraggedClick, true);
+        root.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            openSettingsModal();
+        });
+        document.addEventListener('cgpt-open-settings', () => {
+            openSettingsModal();
+        });
+        document.addEventListener('cgpt-trigger-rename', (event) => {
+            const title = event && event.detail && event.detail.title ? event.detail.title : '';
+            void runRenameWorkflow(title);
+        });
 
         (document.body || document.documentElement).appendChild(root);
         updateTogglePosition();
         updateToggleState();
         updateWebSearchToggleState();
+        updateRenameToggleState();
+        applyButtonVisibility();
         return root;
     }
 
@@ -640,6 +1179,286 @@
         webSearchActivation.editor = getComposerEditor(form);
         webSearchActivation.composerIdentity = getComposerIdentity(form);
         evaluateWebSearchState();
+    }
+
+    function handleRenameToggleClick() {
+        if (consumeSuppressedClick()) return;
+        if (!getConversationId()) {
+            warn('Rename is only available inside a saved conversation.');
+            flashRenameState('failed');
+            return;
+        }
+        void runRenameWorkflow();
+    }
+
+    function flashRenameState(state) {
+        renameSequence += 1;
+        renameState = state;
+        updateRenameToggleState();
+        const sequence = renameSequence;
+        window.setTimeout(() => {
+            if (sequence !== renameSequence) return;
+            renameState = 'idle';
+            updateRenameToggleState();
+        }, ERROR_STATE_MS);
+    }
+
+    function setRenameState(state) {
+        renameState = state;
+        updateRenameToggleState();
+    }
+
+    function updateRenameToggleState() {
+        const root = document.getElementById(ROOT_ID);
+        if (!root) return;
+        const button = root.querySelector(SELECTORS.renameToggle);
+        if (!button) return;
+
+        const busy = renameState === 'waiting';
+        const label = renameState === 'waiting'
+            ? '重命名：执行中'
+            : (renameState === 'failed' ? '重命名：失败，可点击重试' : '重命名当前对话');
+        root.dataset.renameState = renameState;
+        button.setAttribute('aria-label', label);
+        button.setAttribute('aria-busy', busy ? 'true' : 'false');
+        button.setAttribute('title', label);
+        button.dataset.tooltip = label;
+    }
+
+    async function runRenameWorkflow(presetTitle) {
+        const sequence = ++renameSequence;
+        setRenameState('waiting');
+
+        try {
+            const newTitle = presetTitle ? sanitizeTitle(presetTitle) : await getRenameTitle();
+            if (!newTitle) {
+                setRenameState('idle');
+                return;
+            }
+
+            const item = getActiveSidebarItem();
+            if (!item) throw new Error('sidebar-item-not-found');
+
+            const actionsButton = await waitForSidebarActionsButton(item, sequence);
+            if (sequence !== renameSequence) return;
+            if (!actionsButton) {
+                dismissOpenMenuBestEffort();
+                throw new Error('actions-button-not-found');
+            }
+
+            actionsButton.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+            actionsButton.click();
+            const menuItem = await waitUntil(findVisibleRenameMenuItem, RENAME_MENU_WAIT_MS, sequence);
+            if (sequence !== renameSequence) return;
+            if (!menuItem) {
+                dismissOpenMenuBestEffort();
+                throw new Error('rename-menu-item-not-found');
+            }
+
+            menuItem.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+            menuItem.click();
+            const input = await waitUntil(findRenameInput, RENAME_INPUT_WAIT_MS, sequence);
+            if (sequence !== renameSequence) return;
+            if (!input) throw new Error('rename-input-not-found');
+
+            applyRenameTitle(input, newTitle);
+            if (settings.renameRequireConfirm) {
+                input.focus();
+                if (typeof input.select === 'function') {
+                    input.select();
+                }
+                log('Conversation rename pre-filled for manual confirmation.', { newTitle });
+                setRenameState('idle');
+                showToast('ℹ️ 已填入新标题，请微调后按回车或点击保存');
+                return;
+            }
+            submitRenameInput(input);
+            log('Conversation rename submitted.', { newTitle });
+            setRenameState('idle');
+            showToast('✅ 会话已重命名为：' + newTitle);
+        } catch (error) {
+            if (sequence !== renameSequence) return;
+            warn('Unable to rename the current conversation.', { error: String(error) });
+            flashRenameState('failed');
+            showToast('❌ 重命名失败: ' + (error && error.message ? error.message : '未知错误'), 'error');
+        }
+    }
+
+    async function waitUntil(check, timeoutMs, sequence) {
+        const deadline = Date.now() + timeoutMs;
+        while (sequence === renameSequence) {
+            const result = check();
+            if (result) return result;
+            if (Date.now() >= deadline) return null;
+            await delay(RENAME_RETRY_TICK_MS);
+        }
+        return null;
+    }
+
+    function getActiveSidebarItem() {
+        const conversationId = getConversationId();
+        if (!conversationId) return null;
+        const links = Array.from(document.querySelectorAll(SELECTORS.sidebarConversationLink));
+        const found = links.find((link) => (link.getAttribute('href') || '').indexOf('/c/' + conversationId) !== -1);
+        if (found) return found;
+        return document.querySelector('a[href*="/c/' + conversationId + '"]');
+    }
+
+    function getSidebarItemRow(item) {
+        return item.closest('.sidebar-item')
+            || item.closest('li')
+            || item.closest('[data-testid^="conversation"], [class*="conversation"]')
+            || item.parentElement;
+    }
+
+    function findSidebarActionsButton(item) {
+        const row = getSidebarItemRow(item);
+        if (!row) return null;
+        const buttons = row.querySelectorAll('button[aria-label], [role="button"][aria-label]');
+        return Array.from(buttons).find((button) => (
+            isActionable(button)
+            && RENAME_ACTION_RE.test(normalizeText(button.getAttribute('aria-label') || ''))
+        )) || null;
+    }
+
+    async function waitForSidebarActionsButton(item, sequence) {
+        const existing = findSidebarActionsButton(item);
+        if (existing) return existing;
+
+        // Sidebar rows reveal the options button on hover; simulate it once.
+        const row = getSidebarItemRow(item);
+        if (row) {
+            for (const type of ['pointerover', 'mouseover']) {
+                try {
+                    row.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+                } catch (_error) {
+                    // Hover simulation is best-effort; the polling loop still applies.
+                }
+            }
+        }
+        return waitUntil(() => findSidebarActionsButton(item), RENAME_MENU_WAIT_MS, sequence);
+    }
+
+    function findVisibleRenameMenuItem() {
+        const candidates = document.querySelectorAll('[role="menuitem"], .__menu-item, [role="menu"] button');
+        return Array.from(candidates).find((candidate) => {
+            if (!isActionable(candidate) || candidate.getAttribute('aria-disabled') === 'true') return false;
+            if (candidate.matches('[role="menuitem"]') && !candidate.closest('[role="menu"]')) return false;
+            return RENAME_MENUITEM_RE.test(normalizeText(candidate.textContent));
+        }) || null;
+    }
+
+    function findRenameInput() {
+        const candidates = document.querySelectorAll(SELECTORS.renameInput);
+        return Array.from(candidates).find((candidate) => isActionable(candidate) || candidate === document.activeElement)
+            || null;
+    }
+
+    function sanitizeTitle(text) {
+        if (!text) return '';
+        const firstLine = String(text).trim().split(/\r?\n/)[0] || '';
+        return firstLine
+            .replace(/^[`"'#*>\-\d.\s]+/, '')
+            .replace(/[`"'#*>\-\s]+$/, '')
+            .trim();
+    }
+
+    async function getRenameTitle() {
+        let clipboardText = '';
+        try {
+            if (navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
+                clipboardText = await navigator.clipboard.readText();
+            }
+        } catch (err) {
+            warn('Unable to read clipboard.', { error: String(err) });
+        }
+        const cleaned = sanitizeTitle(clipboardText);
+        if (cleaned) return cleaned;
+
+        const manual = window.prompt('未从剪贴板读取到有效标题，请输入新会话标题：', clipboardText.trim());
+        return sanitizeTitle(manual || '');
+    }
+
+    function applyRenameTitle(input, title) {
+        if (input.isContentEditable) {
+            setContentEditableValue(input, title);
+            return;
+        }
+        setInputValue(input, title);
+    }
+
+    function setInputValue(input, value) {
+        const prototype = input instanceof HTMLTextAreaElement
+            ? window.HTMLTextAreaElement.prototype
+            : window.HTMLInputElement.prototype;
+        const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+        if (descriptor && descriptor.set) {
+            descriptor.set.call(input, value);
+        } else {
+            input.value = value;
+        }
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    function setContentEditableValue(element, value) {
+        element.focus();
+        try {
+            const selection = window.getSelection();
+            if (selection) {
+                const range = document.createRange();
+                range.selectNodeContents(element);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+            if (!document.execCommand || !document.execCommand('insertText', false, value)) {
+                element.textContent = value;
+            }
+        } catch (_error) {
+            element.textContent = value;
+        }
+        element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: value }));
+    }
+
+    function submitRenameInput(input) {
+        const dialog = input.closest('[role="dialog"], .dialog, div[class*="dialog"]');
+        if (dialog) {
+            const saveBtn = Array.from(dialog.querySelectorAll('button')).find((b) => {
+                const text = normalizeText(b.innerText || '');
+                return /^(save|保存|确认|确定)$/i.test(text);
+            });
+            if (saveBtn) {
+                saveBtn.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true }));
+                saveBtn.click();
+                return;
+            }
+        }
+
+        input.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'Enter',
+            code: 'Enter',
+            keyCode: 13,
+            which: 13,
+            bubbles: true,
+            cancelable: true,
+        }));
+        input.dispatchEvent(new KeyboardEvent('keypress', {
+            key: 'Enter',
+            code: 'Enter',
+            keyCode: 13,
+            which: 13,
+            bubbles: true,
+            cancelable: true,
+        }));
+        input.dispatchEvent(new KeyboardEvent('keyup', {
+            key: 'Enter',
+            code: 'Enter',
+            keyCode: 13,
+            which: 13,
+            bubbles: true,
+            cancelable: true,
+        }));
+        if (typeof input.blur === 'function') input.blur();
     }
 
     function updateToggleState() {

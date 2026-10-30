@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const path = require('node:path');
-const source = fs.readFileSync(path.join(__dirname, '..', 'ChatGPTAutoReadAloud.user.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '..', 'ChatGPTToolkit.user.js'), 'utf8');
 function fixture({ auto = true, path = '/c/existing', draft = '', attachment = false, conflict = false, menuMissing = false, search = false } = {}) {
   let now = 1000, seq = 0;
   const timers = new Map();
@@ -161,4 +161,9 @@ test('Project Work and Temporary Chat remain protected', () => {
 
 assert.equal((source.match(/new MutationObserver\(/g)||[]).length,1);
 assert.equal(source.includes('setInterval('),false);
+assert.ok(source.includes('// @name         ChatGPT Toolkit'), 'Metadata @name must be ChatGPT Toolkit');
+assert.ok(source.includes('// @version      1.3.0'), 'Metadata @version must be 1.3.0');
+assert.ok(source.includes('ChatGPTToolkit.user.js'), 'Download & update URLs must point to ChatGPTToolkit.user.js');
+assert.ok(source.includes("const PREFIX = '[ChatGPTToolkit]';"), 'PREFIX constant must be [ChatGPTToolkit]');
+assert.ok(source.includes("'chatgpt-toolkit:auto-web-search-enabled'"), 'STORAGE keys must use chatgpt-toolkit namespace');
 console.log(JSON.stringify({passed:results.length,checks:results,singleObserver:true,noPermanentPolling:true},null,2));
